@@ -21,6 +21,21 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(undefined);
 
+  // State refs for game loop
+  const gameStateRef = useRef(gameState);
+  const questionsRef = useRef(questions);
+  const currentQuestionIndexRef = useRef(currentQuestionIndex);
+  const feedbackRef = useRef(feedback);
+  const livesRef = useRef(lives);
+
+  useEffect(() => {
+    gameStateRef.current = gameState;
+    questionsRef.current = questions;
+    currentQuestionIndexRef.current = currentQuestionIndex;
+    feedbackRef.current = feedback;
+    livesRef.current = lives;
+  }, [gameState, questions, currentQuestionIndex, feedback, lives]);
+
   // Game entities
   const playerRef = useRef({
     pos: { x: 200, y: 904 },
@@ -184,7 +199,8 @@ const App: React.FC = () => {
   };
 
   const update = useCallback(() => {
-    if (gameState !== GameState.PLAYING && gameState !== GameState.SUCCESS) return;
+    const currentState = gameStateRef.current;
+    if (currentState !== GameState.PLAYING && currentState !== GameState.SUCCESS) return;
 
     const player = playerRef.current;
     const now = performance.now();
@@ -245,18 +261,18 @@ const App: React.FC = () => {
             player.vel.y = 0;
             audioService.playHit();
 
-            if (block.type === 'QUESTION' && !block.isHit && gameState === GameState.PLAYING && !feedback) {
+            if (block.type === 'QUESTION' && !block.isHit && gameStateRef.current === GameState.PLAYING && !feedbackRef.current) {
               block.isHit = true;
-              const currentQ = questions[currentQuestionIndex];
+              const currentQ = questionsRef.current[currentQuestionIndexRef.current];
               if (block.label === currentQ.correctAnswer) {
                 setFeedback('CORRECT!');
                 audioService.playCorrect();
                 setTimeout(() => {
                   setFeedback(null);
-                  if (currentQuestionIndex + 1 < questions.length) {
-                    const nextIndex = currentQuestionIndex + 1;
+                  if (currentQuestionIndexRef.current + 1 < questionsRef.current.length) {
+                    const nextIndex = currentQuestionIndexRef.current + 1;
                     setCurrentQuestionIndex(nextIndex);
-                    initLevel(questions[nextIndex]);
+                    initLevel(questionsRef.current[nextIndex]);
                   } else {
                     setGameState(GameState.SUCCESS);
                     spawnCastleLevel();
@@ -354,7 +370,7 @@ const App: React.FC = () => {
         return nextLives;
       });
     }
-  }, [gameState, questions, currentQuestionIndex, initLevel, spawnCastleLevel, feedback]);
+  }, [initLevel, spawnCastleLevel]); // Dependencies reduced significantly
 
   const drawPlayer = (ctx: CanvasRenderingContext2D) => {
     const p = playerRef.current;
@@ -499,10 +515,10 @@ const App: React.FC = () => {
 
     enemiesRef.current.forEach(enemy => drawEnemy(ctx, enemy));
 
-    if (gameState !== GameState.GAMEOVER) {
+    if (gameStateRef.current !== GameState.GAMEOVER) {
       drawPlayer(ctx);
     }
-  }, [currentQuestionIndex, gameState]);
+  }, []); // Constant draw function
 
   const loop = useCallback(() => {
     const canvas = canvasRef.current;
