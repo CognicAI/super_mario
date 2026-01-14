@@ -25,7 +25,7 @@ const GameUI: React.FC<GameUIProps> = ({
   totalQuestions,
   lives
 }) => {
-  const [topic, setTopic] = React.useState('General Science');
+  const [topic, setTopic] = React.useState('Procure to pay process');
 
   if (gameState === GameState.MENU) {
     return (
