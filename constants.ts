@@ -1,10 +1,10 @@
 
-export const TILE_SIZE = 40;
+export const TILE_SIZE = 80;
 export const GRAVITY = 0.55;
 export const JUMP_STRENGTH = -14.0;
 export const MOVE_SPEED = 6.0;
-export const CANVAS_WIDTH = 800;
-export const CANVAS_HEIGHT = 600;
+export const CANVAS_WIDTH = 1920;
+export const CANVAS_HEIGHT = 1080;
 
 export const COLORS = {
   SKY: '#5C94FC',

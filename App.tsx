@@ -22,10 +22,10 @@ const App: React.FC = () => {
   
   // Game entities
   const playerRef = useRef({
-    pos: { x: 100, y: 450 },
+    pos: { x: 200, y: 904 },
     vel: { x: 0, y: 0 },
-    width: 32,
-    height: 48,
+    width: 64,
+    height: 96,
     grounded: false,
     lastGroundedTime: 0,
     facing: 1 as 1 | -1
@@ -82,12 +82,12 @@ const App: React.FC = () => {
 
     // Question Blocks
     const centerX = CANVAS_WIDTH / 2;
-    const blockSpacing = 180;
+    const blockSpacing = 360;
     question.options.forEach((opt, idx) => {
       blocks.push({
         type: 'QUESTION',
         label: opt,
-        pos: { x: (centerX - (question.options.length * blockSpacing) / 2) + idx * blockSpacing, y: 400 },
+        pos: { x: (centerX - (question.options.length * blockSpacing) / 2) + idx * blockSpacing, y: 720 },
         vel: { x: 0, y: 0 },
         width: TILE_SIZE,
         height: TILE_SIZE,
@@ -98,10 +98,10 @@ const App: React.FC = () => {
     // Spawn 1-2 Goombas per level
     enemies.push({
       type: 'GOOMBA',
-      pos: { x: CANVAS_WIDTH - 150, y: CANVAS_HEIGHT - TILE_SIZE - 32 },
+      pos: { x: CANVAS_WIDTH - 300, y: CANVAS_HEIGHT - TILE_SIZE - 64 },
       vel: { x: -ENEMY_SPEED, y: 0 },
-      width: 32,
-      height: 32,
+      width: 64,
+      height: 64,
       isDead: false,
       deadTimer: 0,
       facing: -1
@@ -109,7 +109,7 @@ const App: React.FC = () => {
 
     blocksRef.current = blocks;
     enemiesRef.current = enemies;
-    playerRef.current.pos = { x: 100, y: 450 };
+    playerRef.current.pos = { x: 200, y: 904 };
     playerRef.current.vel = { x: 0, y: 0 };
   }, []);
 
@@ -127,13 +127,13 @@ const App: React.FC = () => {
     }
     blocks.push({
       type: 'CASTLE',
-      pos: { x: 600, y: CANVAS_HEIGHT - TILE_SIZE - 120 },
+      pos: { x: 1200, y: CANVAS_HEIGHT - TILE_SIZE - 240 },
       vel: { x: 0, y: 0 },
-      width: 120,
-      height: 120
+      width: 240,
+      height: 240
     });
     blocksRef.current = blocks;
-    playerRef.current.pos = { x: 100, y: 450 };
+    playerRef.current.pos = { x: 200, y: 904 };
     audioService.playSuccess();
   }, []);
 
@@ -147,6 +147,38 @@ const App: React.FC = () => {
       initLevel(fetched[0]);
       setGameState(GameState.PLAYING);
     }
+  };
+
+  const handleStartOffline = () => {
+    setGameState(GameState.LOADING);
+    setLives(INITIAL_LIVES);
+    
+    // Offline development mode questions
+    const offlineQuestions: Question[] = [
+      {
+        id: 1,
+        text: "What is the capital of France?",
+        options: ["London", "Paris", "Berlin", "Madrid"],
+        correctAnswer: "Paris"
+      },
+      {
+        id: 2,
+        text: "What is 5 × 7?",
+        options: ["30", "35", "40", "45"],
+        correctAnswer: "35"
+      },
+      {
+        id: 3,
+        text: "Which planet is known as the Red Planet?",
+        options: ["Venus", "Mars", "Jupiter", "Saturn"],
+        correctAnswer: "Mars"
+      }
+    ];
+    
+    setQuestions(offlineQuestions);
+    setCurrentQuestionIndex(0);
+    initLevel(offlineQuestions[0]);
+    setTimeout(() => setGameState(GameState.PLAYING), 500);
   };
 
   const update = useCallback(() => {
@@ -275,13 +307,15 @@ const App: React.FC = () => {
           player.vel.y = JUMP_STRENGTH * 0.6; // Bounce
           audioService.playStomp();
         } else {
-          // Hit from side - Reset player and decrement lives
+          // Hit from side - Enemy also dies when it hits player
+          enemy.isDead = true;
+          // Reset player and decrement lives
           setLives(prev => {
             const nextLives = prev - 1;
             if (nextLives <= 0) {
               setGameState(GameState.GAMEOVER);
             } else {
-              player.pos = { x: 100, y: 450 };
+              player.pos = { x: 200, y: 904 };
               player.vel = { x: 0, y: 0 };
               audioService.playIncorrect();
             }
@@ -291,8 +325,8 @@ const App: React.FC = () => {
       }
     });
 
-    // Cleanup dead enemies
-    enemiesRef.current = enemiesRef.current.filter(e => !e.isDead || e.deadTimer < 30);
+    // Cleanup dead enemies - only remove if dead AND animation finished
+    enemiesRef.current = enemiesRef.current.filter(e => !(e.isDead && e.deadTimer >= 30));
 
     if (player.grounded) {
       player.lastGroundedTime = now;
@@ -305,7 +339,7 @@ const App: React.FC = () => {
         if (nextLives <= 0) {
           setGameState(GameState.GAMEOVER);
         } else {
-          player.pos = { x: 100, y: 450 };
+          player.pos = { x: 200, y: 904 };
           player.vel = { x: 0, y: 0 };
           audioService.playIncorrect();
         }
@@ -320,7 +354,7 @@ const App: React.FC = () => {
 
   const drawPlayer = (ctx: CanvasRenderingContext2D) => {
     const p = playerRef.current;
-    const pixelSize = 3;
+    const pixelSize = 6;
     const startX = p.pos.x + (p.width - (12 * pixelSize)) / 2;
     const startY = p.pos.y;
 
@@ -346,9 +380,9 @@ const App: React.FC = () => {
   };
 
   const drawEnemy = (ctx: CanvasRenderingContext2D, enemy: Enemy) => {
-    const pixelSize = enemy.isDead ? 1.5 : 3;
+    const pixelSize = enemy.isDead ? 3 : 6;
     const startX = enemy.pos.x;
-    const startY = enemy.isDead ? enemy.pos.y + 16 : enemy.pos.y;
+    const startY = enemy.isDead ? enemy.pos.y + 32 : enemy.pos.y;
 
     GOOMBA_PIXELS.forEach((row, y) => {
       for (let x = 0; x < row.length; x++) {
@@ -369,39 +403,39 @@ const App: React.FC = () => {
   const drawEnvironment = (ctx: CanvasRenderingContext2D) => {
     // Static background elements
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    [ {x: 80, y: 50}, {x: 350, y: 100}, {x: 600, y: 40}, {x: 800, y: 80} ].forEach(cloud => {
+    [ {x: 160, y: 100}, {x: 700, y: 200}, {x: 1200, y: 80}, {x: 1600, y: 160} ].forEach(cloud => {
       ctx.beginPath();
-      ctx.arc(cloud.x, cloud.y, 15, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 15, cloud.y - 8, 25, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 30, cloud.y, 15, 0, Math.PI * 2);
+      ctx.arc(cloud.x, cloud.y, 30, 0, Math.PI * 2);
+      ctx.arc(cloud.x + 30, cloud.y - 16, 50, 0, Math.PI * 2);
+      ctx.arc(cloud.x + 60, cloud.y, 30, 0, Math.PI * 2);
       ctx.fill();
     });
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    [ {x: 150, y: 80}, {x: 450, y: 120}, {x: 750, y: 60} ].forEach(cloud => {
+    [ {x: 300, y: 160}, {x: 900, y: 240}, {x: 1500, y: 120} ].forEach(cloud => {
       ctx.beginPath();
-      ctx.arc(cloud.x, cloud.y, 25, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 25, cloud.y - 10, 35, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 50, cloud.y, 25, 0, Math.PI * 2);
+      ctx.arc(cloud.x, cloud.y, 50, 0, Math.PI * 2);
+      ctx.arc(cloud.x + 50, cloud.y - 20, 70, 0, Math.PI * 2);
+      ctx.arc(cloud.x + 100, cloud.y, 50, 0, Math.PI * 2);
       ctx.fill();
     });
 
     ctx.fillStyle = '#3E8E58';
-    [ {x: 100, w: 300, h: 120}, {x: 500, w: 400, h: 180}, {x: 850, w: 250, h: 90} ].forEach(hill => {
+    [ {x: 200, w: 600, h: 240}, {x: 1000, w: 800, h: 360}, {x: 1700, w: 500, h: 180} ].forEach(hill => {
       ctx.beginPath();
       ctx.ellipse(hill.x, CANVAS_HEIGHT - TILE_SIZE, hill.w / 2, hill.h, 0, Math.PI, 0);
       ctx.fill();
     });
 
     ctx.fillStyle = '#4FB06D';
-    [ {x: 250, w: 200, h: 80}, {x: 650, w: 250, h: 110} ].forEach(hill => {
+    [ {x: 500, w: 400, h: 160}, {x: 1300, w: 500, h: 220} ].forEach(hill => {
       ctx.beginPath();
       ctx.ellipse(hill.x, CANVAS_HEIGHT - TILE_SIZE, hill.w / 2, hill.h, 0, Math.PI, 0);
       ctx.fill();
     });
 
     ctx.fillStyle = '#228B22';
-    [ {x: 50, w: 60}, {x: 300, w: 80}, {x: 550, w: 50}, {x: 780, w: 70} ].forEach(bush => {
+    [ {x: 100, w: 120}, {x: 600, w: 160}, {x: 1100, w: 100}, {x: 1560, w: 140} ].forEach(bush => {
       ctx.beginPath();
       ctx.arc(bush.x, CANVAS_HEIGHT - TILE_SIZE, bush.w / 2, Math.PI, 0);
       ctx.fill();
@@ -431,13 +465,13 @@ const App: React.FC = () => {
           ctx.strokeStyle = 'rgba(255,255,255,0.5)';
           ctx.strokeRect(block.pos.x + 4, block.pos.y + 4, block.width - 8, block.height - 8);
           ctx.fillStyle = '#000';
-          ctx.font = 'bold 24px Arial';
+          ctx.font = 'bold 48px Arial';
           ctx.textAlign = 'center';
-          ctx.fillText('?', block.pos.x + block.width / 2, block.pos.y + 32);
+          ctx.fillText('?', block.pos.x + block.width / 2, block.pos.y + 38);
         }
 
         ctx.fillStyle = '#fff';
-        ctx.font = '8px "Press Start 2P"';
+        ctx.font = '18px "Press Start 2P"';
         ctx.textAlign = 'center';
         const words = block.label?.split(' ') || [];
         const lines: string[] = [];
@@ -448,7 +482,7 @@ const App: React.FC = () => {
         });
         lines.push(currentLine);
         lines.reverse().forEach((line, i) => {
-          ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 20 - (i * 12));
+          ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - (i * 24));
         });
       } else if (block.type === 'CASTLE') {
         ctx.fillStyle = COLORS.CASTLE;
@@ -491,13 +525,20 @@ const App: React.FC = () => {
 
   return (
     <div className="flex items-center justify-center w-screen h-screen bg-neutral-900 overflow-hidden relative">
-      <div className="relative border-8 border-black shadow-2xl overflow-hidden rounded-xl bg-sky-400">
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} />
+      <div className="relative border-8 border-black shadow-2xl overflow-hidden rounded-xl bg-sky-400 max-w-[95vw] max-h-[95vh]">
+        <canvas 
+          ref={canvasRef} 
+          width={CANVAS_WIDTH} 
+          height={CANVAS_HEIGHT}
+          className="w-full h-full"
+          style={{ imageRendering: 'pixelated' }}
+        />
         <GameUI 
           gameState={gameState}
           currentQuestion={questions[currentQuestionIndex]}
           currentQuestionIndex={currentQuestionIndex}
           onStart={handleStart}
+          onStartOffline={handleStartOffline}
           feedback={feedback}
           score={currentQuestionIndex * 100}
           totalQuestions={questions.length}

@@ -7,6 +7,7 @@ interface GameUIProps {
   currentQuestion?: Question;
   currentQuestionIndex?: number;
   onStart: (topic: string) => void;
+  onStartOffline: () => void;
   feedback: string | null;
   score: number;
   totalQuestions: number;
@@ -17,7 +18,8 @@ const GameUI: React.FC<GameUIProps> = ({
   gameState, 
   currentQuestion, 
   currentQuestionIndex = 0,
-  onStart, 
+  onStart,
+  onStartOffline, 
   feedback, 
   score, 
   totalQuestions,
@@ -27,26 +29,32 @@ const GameUI: React.FC<GameUIProps> = ({
 
   if (gameState === GameState.MENU) {
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-6 z-50">
-        <h1 className="text-4xl mb-8 text-yellow-400 text-center uppercase leading-relaxed">Super Mario<br/>Quiz Quest</h1>
-        <div className="w-full max-w-md">
-          <label className="block text-xs mb-2">ENTER A TOPIC:</label>
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-12 z-50">
+        <h1 className="text-7xl mb-16 text-yellow-400 text-center uppercase leading-relaxed">Super Mario<br/>Quiz Quest</h1>
+        <div className="w-full max-w-3xl">
+          <label className="block text-xl mb-4">ENTER A TOPIC:</label>
           <input 
             type="text" 
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            className="w-full bg-white text-black p-4 mb-6 font-inherit outline-none border-4 border-yellow-500"
+            className="w-full bg-white text-black p-6 mb-10 font-inherit outline-none border-4 border-yellow-500 text-xl"
           />
           <button 
             onClick={() => onStart(topic)}
-            className="w-full bg-red-600 hover:bg-red-700 text-white p-4 text-xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all"
+            className="w-full bg-red-600 hover:bg-red-700 text-white p-6 text-3xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all mb-6"
           >
             START GAME
           </button>
+          <button 
+            onClick={onStartOffline}
+            className="w-full bg-green-600 hover:bg-green-700 text-white p-5 text-xl border-b-8 border-green-900 active:border-b-0 active:translate-y-2 transition-all"
+          >
+            🎮 OFFLINE MODE (DEV)
+          </button>
         </div>
-        <div className="mt-12 text-center">
-            <p className="text-[10px] text-gray-400 mb-4 animate-pulse">JUMP INTO THE RIGHT BLOCK TO ANSWER</p>
-            <p className="text-[8px] text-gray-500">ARROW KEYS TO MOVE & JUMP</p>
+        <div className="mt-20 text-center">
+            <p className="text-lg text-gray-400 mb-6 animate-pulse">JUMP INTO THE RIGHT BLOCK TO ANSWER</p>
+            <p className="text-base text-gray-500">ARROW KEYS TO MOVE & JUMP</p>
         </div>
       </div>
     );
@@ -55,41 +63,41 @@ const GameUI: React.FC<GameUIProps> = ({
   if (gameState === GameState.LOADING) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-sky-500 text-white z-50">
-        <div className="text-2xl animate-pulse">GENERATING LEVEL...</div>
+        <div className="text-5xl animate-pulse">GENERATING LEVEL...</div>
       </div>
     );
   }
 
   return (
-    <div className="absolute inset-0 pointer-events-none p-4">
+    <div className="absolute inset-0 pointer-events-none p-8">
       {/* HUD */}
-      <div className="flex justify-between items-start text-white text-sm">
-        <div className="flex flex-col gap-2">
+      <div className="flex justify-between items-start text-white text-2xl">
+        <div className="flex flex-col gap-4">
           <div>
-            <div className="text-yellow-300 mb-1">MARIO</div>
-            <div>{score.toString().padStart(6, '0')}</div>
+            <div className="text-yellow-300 mb-2 text-xl">MARIO</div>
+            <div className="text-2xl">{score.toString().padStart(6, '0')}</div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-red-500 text-lg">❤</span>
-            <span>x{lives}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-red-500 text-3xl">❤</span>
+            <span className="text-2xl">x{lives}</span>
           </div>
         </div>
-        <div className="text-center max-w-lg">
-          <div className="text-yellow-300 mb-1 uppercase">QUESTION {currentQuestionIndex + 1}/{totalQuestions}</div>
-          <div className="bg-white/10 backdrop-blur-sm p-4 border-2 border-white rounded shadow-lg text-[10px] leading-5">
+        <div className="text-center max-w-3xl">
+          <div className="text-yellow-300 mb-3 uppercase text-2xl">QUESTION {currentQuestionIndex + 1}/{totalQuestions}</div>
+          <div className="bg-white/10 backdrop-blur-sm p-6 border-2 border-white rounded shadow-lg text-xl leading-7">
             {currentQuestion?.text}
           </div>
         </div>
         <div>
-          <div className="text-yellow-300 mb-1">WORLD</div>
-          <div>1-1</div>
+          <div className="text-yellow-300 mb-2 text-xl">WORLD</div>
+          <div className="text-2xl">1-1</div>
         </div>
       </div>
 
       {/* Feedback Alert */}
       {feedback && (
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
-          <div className={`text-4xl font-bold uppercase ${feedback === 'CORRECT!' ? 'text-green-500' : 'text-red-500'} drop-shadow-lg animate-bounce`}>
+          <div className={`text-8xl font-bold uppercase ${feedback === 'CORRECT!' ? 'text-green-500' : 'text-red-500'} drop-shadow-lg animate-bounce`}>
             {feedback}
           </div>
         </div>
@@ -98,10 +106,10 @@ const GameUI: React.FC<GameUIProps> = ({
       {/* Game Over Screen */}
       {gameState === GameState.GAMEOVER && (
         <div className="absolute inset-0 bg-black flex flex-col items-center justify-center pointer-events-auto z-[100]">
-          <h2 className="text-5xl text-red-600 mb-8 uppercase animate-pulse">Game Over</h2>
+          <h2 className="text-8xl text-red-600 mb-16 uppercase animate-pulse">Game Over</h2>
           <button 
             onClick={() => window.location.reload()}
-            className="bg-white text-black p-4 text-xl border-b-8 border-gray-400 active:border-b-0 active:translate-y-2 transition-all uppercase"
+            className="bg-white text-black p-6 text-3xl border-b-8 border-gray-400 active:border-b-0 active:translate-y-2 transition-all uppercase"
           >
             Try Again
           </button>
@@ -111,11 +119,11 @@ const GameUI: React.FC<GameUIProps> = ({
       {/* Success Screen */}
       {gameState === GameState.SUCCESS && (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center pointer-events-auto z-[100]">
-          <h2 className="text-4xl text-yellow-400 mb-4 uppercase">COURSE CLEAR!</h2>
-          <p className="text-white mb-8">YOU REACHED THE CASTLE!</p>
+          <h2 className="text-7xl text-yellow-400 mb-8 uppercase">COURSE CLEAR!</h2>
+          <p className="text-white mb-12 text-2xl">YOU REACHED THE CASTLE!</p>
           <button 
             onClick={() => window.location.reload()}
-            className="bg-green-600 p-4 text-white border-b-8 border-green-900 active:border-b-0 active:translate-y-2 transition-all uppercase"
+            className="bg-green-600 p-6 text-white text-3xl border-b-8 border-green-900 active:border-b-0 active:translate-y-2 transition-all uppercase"
           >
             Play Again
           </button>

@@ -3,10 +3,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Question } from "../types";
 
 export async function fetchQuestions(topic: string): Promise<Question[]> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
   
   const prompt = `Generate 5 challenging multiple-choice questions about the topic: "${topic}". 
-  Each question must have exactly 3 options. Return the data in valid JSON format.`;
+  Each question must have exactly 4 options. Return the data in valid JSON format.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -43,7 +43,7 @@ export async function fetchQuestions(topic: string): Promise<Question[]> {
       {
         id: 1,
         text: "What is 2 + 2?",
-        options: ["3", "4", "5"],
+        options: ["3", "4", "5", "6"],
         correctAnswer: "4"
       }
     ];

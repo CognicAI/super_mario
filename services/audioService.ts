@@ -47,7 +47,6 @@ class AudioService {
   }
 
   playCorrect() {
-    const now = this.ctx?.currentTime || 0;
     // Arpeggio
     [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
       setTimeout(() => this.playTone(f, 'square', 0.1, 0.05), i * 100);
@@ -55,7 +54,6 @@ class AudioService {
   }
 
   playIncorrect() {
-    const now = this.ctx?.currentTime || 0;
     // Falling dissonant notes
     [200, 150, 100].forEach((f, i) => {
       setTimeout(() => this.playTone(f, 'sawtooth', 0.2, 0.05), i * 150);
