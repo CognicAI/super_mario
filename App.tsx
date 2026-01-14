@@ -9,6 +9,7 @@ import GameUI from './components/GameUI';
 const COYOTE_TIME = 150; // ms
 const ENEMY_SPEED = 2.0;
 const INITIAL_LIVES = 3;
+const INVULNERABILITY_TIME = 1000;
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
@@ -16,10 +17,10 @@ const App: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [lives, setLives] = useState(INITIAL_LIVES);
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(undefined);
-  
+
   // Game entities
   const playerRef = useRef({
     pos: { x: 200, y: 904 },
@@ -28,7 +29,8 @@ const App: React.FC = () => {
     height: 96,
     grounded: false,
     lastGroundedTime: 0,
-    facing: 1 as 1 | -1
+    facing: 1 as 1 | -1,
+    lastHitTime: 0
   });
 
   const blocksRef = useRef<Block[]>([]);
@@ -68,7 +70,7 @@ const App: React.FC = () => {
   const initLevel = useCallback((question: Question) => {
     const blocks: Block[] = [];
     const enemies: Enemy[] = [];
-    
+
     // Floor
     for (let i = 0; i < CANVAS_WIDTH / TILE_SIZE; i++) {
       blocks.push({
@@ -152,7 +154,7 @@ const App: React.FC = () => {
   const handleStartOffline = () => {
     setGameState(GameState.LOADING);
     setLives(INITIAL_LIVES);
-    
+
     // Offline development mode questions
     const offlineQuestions: Question[] = [
       {
@@ -174,7 +176,7 @@ const App: React.FC = () => {
         correctAnswer: "Mars"
       }
     ];
-    
+
     setQuestions(offlineQuestions);
     setCurrentQuestionIndex(0);
     initLevel(offlineQuestions[0]);
@@ -201,7 +203,7 @@ const App: React.FC = () => {
     // Jump Logic
     const canJump = player.grounded || (now - player.lastGroundedTime < COYOTE_TIME);
     const jumpPressed = keys.current['ArrowUp'] || keys.current['w'] || keys.current['W'] || keys.current[' '];
-    
+
     if (jumpPressed && canJump) {
       player.vel.y = JUMP_STRENGTH;
       player.grounded = false;
@@ -308,19 +310,24 @@ const App: React.FC = () => {
           audioService.playStomp();
         } else {
           // Hit from side - Enemy also dies when it hits player
-          enemy.isDead = true;
-          // Reset player and decrement lives
-          setLives(prev => {
-            const nextLives = prev - 1;
-            if (nextLives <= 0) {
-              setGameState(GameState.GAMEOVER);
-            } else {
-              player.pos = { x: 200, y: 904 };
-              player.vel = { x: 0, y: 0 };
-              audioService.playIncorrect();
-            }
-            return nextLives;
-          });
+          if (now - player.lastHitTime > INVULNERABILITY_TIME) {
+            enemy.isDead = true;
+            player.lastHitTime = now;
+
+            // Apply penalty/reset immediately
+            player.pos = { x: 200, y: 904 };
+            player.vel = { x: 0, y: 0 };
+            audioService.playIncorrect();
+
+            // Handle life loss
+            setLives(prev => {
+              const nextLives = prev - 1;
+              if (nextLives <= 0) {
+                setGameState(GameState.GAMEOVER);
+              }
+              return nextLives;
+            });
+          }
         }
       }
     });
@@ -332,23 +339,20 @@ const App: React.FC = () => {
       player.lastGroundedTime = now;
     }
 
-    if (player.pos.y > CANVAS_HEIGHT) {
+    if (player.pos.y > CANVAS_HEIGHT && now - player.lastHitTime > INVULNERABILITY_TIME) {
       // Pit logic
+      player.lastHitTime = now;
+      player.pos = { x: 200, y: 904 };
+      player.vel = { x: 0, y: 0 };
+      audioService.playIncorrect();
+
       setLives(prev => {
         const nextLives = prev - 1;
         if (nextLives <= 0) {
           setGameState(GameState.GAMEOVER);
-        } else {
-          player.pos = { x: 200, y: 904 };
-          player.vel = { x: 0, y: 0 };
-          audioService.playIncorrect();
         }
         return nextLives;
       });
-      // Temporary safety to prevent infinite loop
-      player.pos.y = CANVAS_HEIGHT - player.height - TILE_SIZE;
-      player.vel.y = 0;
-      player.grounded = true;
     }
   }, [gameState, questions, currentQuestionIndex, initLevel, spawnCastleLevel, feedback]);
 
@@ -403,7 +407,7 @@ const App: React.FC = () => {
   const drawEnvironment = (ctx: CanvasRenderingContext2D) => {
     // Static background elements
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    [ {x: 160, y: 100}, {x: 700, y: 200}, {x: 1200, y: 80}, {x: 1600, y: 160} ].forEach(cloud => {
+    [{ x: 160, y: 100 }, { x: 700, y: 200 }, { x: 1200, y: 80 }, { x: 1600, y: 160 }].forEach(cloud => {
       ctx.beginPath();
       ctx.arc(cloud.x, cloud.y, 30, 0, Math.PI * 2);
       ctx.arc(cloud.x + 30, cloud.y - 16, 50, 0, Math.PI * 2);
@@ -412,7 +416,7 @@ const App: React.FC = () => {
     });
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    [ {x: 300, y: 160}, {x: 900, y: 240}, {x: 1500, y: 120} ].forEach(cloud => {
+    [{ x: 300, y: 160 }, { x: 900, y: 240 }, { x: 1500, y: 120 }].forEach(cloud => {
       ctx.beginPath();
       ctx.arc(cloud.x, cloud.y, 50, 0, Math.PI * 2);
       ctx.arc(cloud.x + 50, cloud.y - 20, 70, 0, Math.PI * 2);
@@ -421,21 +425,21 @@ const App: React.FC = () => {
     });
 
     ctx.fillStyle = '#3E8E58';
-    [ {x: 200, w: 600, h: 240}, {x: 1000, w: 800, h: 360}, {x: 1700, w: 500, h: 180} ].forEach(hill => {
+    [{ x: 200, w: 600, h: 240 }, { x: 1000, w: 800, h: 360 }, { x: 1700, w: 500, h: 180 }].forEach(hill => {
       ctx.beginPath();
       ctx.ellipse(hill.x, CANVAS_HEIGHT - TILE_SIZE, hill.w / 2, hill.h, 0, Math.PI, 0);
       ctx.fill();
     });
 
     ctx.fillStyle = '#4FB06D';
-    [ {x: 500, w: 400, h: 160}, {x: 1300, w: 500, h: 220} ].forEach(hill => {
+    [{ x: 500, w: 400, h: 160 }, { x: 1300, w: 500, h: 220 }].forEach(hill => {
       ctx.beginPath();
       ctx.ellipse(hill.x, CANVAS_HEIGHT - TILE_SIZE, hill.w / 2, hill.h, 0, Math.PI, 0);
       ctx.fill();
     });
 
     ctx.fillStyle = '#228B22';
-    [ {x: 100, w: 120}, {x: 600, w: 160}, {x: 1100, w: 100}, {x: 1560, w: 140} ].forEach(bush => {
+    [{ x: 100, w: 120 }, { x: 600, w: 160 }, { x: 1100, w: 100 }, { x: 1560, w: 140 }].forEach(bush => {
       ctx.beginPath();
       ctx.arc(bush.x, CANVAS_HEIGHT - TILE_SIZE, bush.w / 2, Math.PI, 0);
       ctx.fill();
@@ -460,7 +464,7 @@ const App: React.FC = () => {
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 2;
         ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
-        
+
         if (!block.isHit) {
           ctx.strokeStyle = 'rgba(255,255,255,0.5)';
           ctx.strokeRect(block.pos.x + 4, block.pos.y + 4, block.width - 8, block.height - 8);
@@ -526,14 +530,14 @@ const App: React.FC = () => {
   return (
     <div className="flex items-center justify-center w-screen h-screen bg-neutral-900 overflow-hidden relative">
       <div className="relative border-8 border-black shadow-2xl overflow-hidden rounded-xl bg-sky-400 max-w-[95vw] max-h-[95vh]">
-        <canvas 
-          ref={canvasRef} 
-          width={CANVAS_WIDTH} 
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
           className="w-full h-full"
           style={{ imageRendering: 'pixelated' }}
         />
-        <GameUI 
+        <GameUI
           gameState={gameState}
           currentQuestion={questions[currentQuestionIndex]}
           currentQuestionIndex={currentQuestionIndex}
