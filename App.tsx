@@ -230,10 +230,10 @@ const App: React.FC = () => {
     // Time scale relative to 60FPS (16.6ms)
     const timeScale = clampedDt / (1 / 60);
 
-    // Save previous position for tunneling checks
+    // Save previous position for anti-tunneling checks
     player.prevPos = { ...player.pos };
 
-    // Movement
+    // === INPUT HANDLING ===
     if (keysInput.current['ArrowLeft'] || keysInput.current['a'] || keysInput.current['A']) {
       player.vel.x = -MOVE_SPEED;
       player.facing = -1;
@@ -259,16 +259,25 @@ const App: React.FC = () => {
       player.vel.y *= 0.5;
     }
 
+    // Apply gravity
     player.vel.y += GRAVITY;
+
+    // === PER-AXIS COLLISION RESOLUTION ===
+
+    // 1. MOVE AND RESOLVE X-AXIS
     player.pos.x += player.vel.x;
-    player.pos.y += player.vel.y;
 
-    if (player.pos.x < 0) player.pos.x = 0;
-    if (player.pos.x + player.width > CANVAS_WIDTH) player.pos.x = CANVAS_WIDTH - player.width;
+    // Clamp to canvas boundaries
+    if (player.pos.x < 0) {
+      player.pos.x = 0;
+      player.vel.x = 0;
+    }
+    if (player.pos.x + player.width > CANVAS_WIDTH) {
+      player.pos.x = CANVAS_WIDTH - player.width;
+      player.vel.x = 0;
+    }
 
-    player.grounded = false;
-
-    // Block collisions
+    // Check X collisions with blocks
     blocksRef.current.forEach((block) => {
       if (
         player.pos.x < block.pos.x + block.width &&
@@ -276,60 +285,82 @@ const App: React.FC = () => {
         player.pos.y < block.pos.y + block.height &&
         player.pos.y + player.height > block.pos.y
       ) {
-        const overlapX = Math.min(player.pos.x + player.width - block.pos.x, block.pos.x + block.width - player.pos.x);
-        const overlapY = Math.min(player.pos.y + player.height - block.pos.y, block.pos.y + block.height - player.pos.y);
+        // X-axis collision detected
+        if (player.vel.x > 0) {
+          // Moving right, hit left side of block
+          player.pos.x = block.pos.x - player.width;
+          player.vel.x = 0;
+        } else if (player.vel.x < 0) {
+          // Moving left, hit right side of block
+          player.pos.x = block.pos.x + block.width;
+          player.vel.x = 0;
+        }
+      }
+    });
 
-        if (overlapX > overlapY) {
-          if (player.vel.y > 0) {
-            player.pos.y = block.pos.y - player.height;
-            player.vel.y = 0;
-            player.grounded = true;
-          } else if (player.vel.y < 0) {
-            player.pos.y = block.pos.y + block.height;
-            player.vel.y = 0;
-            audioService.playHit();
+    // 2. MOVE AND RESOLVE Y-AXIS
+    player.pos.y += player.vel.y;
+    player.grounded = false;
 
-            if (block.type === 'QUESTION' && !block.isHit && gameStateRef.current === GameState.PLAYING && !feedbackRef.current) {
-              block.isHit = true;
-              const currentQ = questionsRef.current[currentQuestionIndexRef.current];
-              if (block.label === currentQ.correctAnswer) {
-                setFeedback('CORRECT!');
-                setShowFunFact(true); // Show fun fact - stays until clicked
-                audioService.playCorrect();
-                // Don't auto-advance - wait for user to dismiss fun fact
-              } else {
-                setFeedback('TRY AGAIN!');
-                audioService.playIncorrect();
-                setTimeout(() => {
-                  setFeedback(null);
-                  block.isHit = false;
-                }, 800);
-              }
+    // Check Y collisions with blocks
+    blocksRef.current.forEach((block) => {
+      if (
+        player.pos.x < block.pos.x + block.width &&
+        player.pos.x + player.width > block.pos.x &&
+        player.pos.y < block.pos.y + block.height &&
+        player.pos.y + player.height > block.pos.y
+      ) {
+        // Y-axis collision detected
+        if (player.vel.y > 0) {
+          // Falling down, hit top of block (FLOOR COLLISION)
+          player.pos.y = block.pos.y - player.height; // Snap UP to floor top
+          player.vel.y = 0;
+          player.grounded = true;
+        } else if (player.vel.y < 0) {
+          // Moving up, hit bottom of block (CEILING COLLISION)
+          player.pos.y = block.pos.y + block.height; // Snap DOWN to ceiling bottom
+          player.vel.y = 0;
+          audioService.playHit();
+
+          // Question block logic
+          if (block.type === 'QUESTION' && !block.isHit && gameStateRef.current === GameState.PLAYING && !feedbackRef.current) {
+            block.isHit = true;
+            const currentQ = questionsRef.current[currentQuestionIndexRef.current];
+            if (block.label === currentQ.correctAnswer) {
+              setFeedback('CORRECT!');
+              setShowFunFact(true);
+              audioService.playCorrect();
+            } else {
+              setFeedback('TRY AGAIN!');
+              audioService.playIncorrect();
+              setTimeout(() => {
+                setFeedback(null);
+                block.isHit = false;
+              }, 800);
             }
           }
-        } else {
-          if (player.vel.x > 0) {
-            player.pos.x = block.pos.x - player.width;
-          } else {
-            player.pos.x = block.pos.x + block.width;
-          }
         }
-      } else {
-        // Anti-tunneling: Check if we passed through a floor
-        // Condition: previous Bottom was <= block Top, AND current Bottom >= block Top
-        // AND x overlap exists
+      }
+    });
+
+    // 3. ANTI-TUNNELING CHECK (for extremely fast falls)
+    // Only check if we didn't already collide above
+    if (!player.grounded) {
+      blocksRef.current.forEach((block) => {
+        // Check if we passed through a floor this frame
         if (
           player.prevPos.y + player.height <= block.pos.y &&
           player.pos.y + player.height >= block.pos.y &&
           player.pos.x < block.pos.x + block.width &&
           player.pos.x + player.width > block.pos.x
         ) {
+          // Tunneled through floor - snap up
           player.pos.y = block.pos.y - player.height;
           player.vel.y = 0;
           player.grounded = true;
         }
-      }
-    });
+      });
+    }
 
     // Enemy logic
     enemiesRef.current.forEach(enemy => {
@@ -338,8 +369,11 @@ const App: React.FC = () => {
         return;
       }
 
-      // Patrol within safe boundaries (don't go too far left to player spawn)
-      const MIN_ENEMY_X = 400; // Keep enemy away from player spawn area
+      // Patrol within safe boundaries (don't overlap with pipe or go to player spawn)
+      const PIPE_X = 350; // Assuming pipe starts at x=350
+      const PIPE_WIDTH = 96; // Assuming pipe width is 96
+      const PIPE_END = PIPE_X + PIPE_WIDTH; // Pipe x position + pipe width = 446
+      const MIN_ENEMY_X = PIPE_END + 20; // Add 20px buffer = 466
       const MAX_ENEMY_X = CANVAS_WIDTH;
 
       enemy.pos.x += enemy.vel.x * timeScale;
