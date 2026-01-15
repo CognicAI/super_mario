@@ -20,6 +20,7 @@ const App: React.FC = () => {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(undefined);
+  const lastTimeRef = useRef<number>(0);
 
   // State refs for game loop
   const gameStateRef = useRef(gameState);
@@ -45,7 +46,8 @@ const App: React.FC = () => {
     grounded: false,
     lastGroundedTime: 0,
     facing: 1 as 1 | -1,
-    lastHitTime: 0
+    lastHitTime: 0,
+    prevPos: { x: 200, y: 904 }
   });
 
   const blocksRef = useRef<Block[]>([]);
@@ -127,6 +129,7 @@ const App: React.FC = () => {
     blocksRef.current = blocks;
     enemiesRef.current = enemies;
     playerRef.current.pos = { x: 200, y: 904 };
+    playerRef.current.prevPos = { x: 200, y: 904 };
     playerRef.current.vel = { x: 0, y: 0 };
   }, []);
 
@@ -151,6 +154,7 @@ const App: React.FC = () => {
     });
     blocksRef.current = blocks;
     playerRef.current.pos = { x: 200, y: 904 };
+    playerRef.current.prevPos = { x: 200, y: 904 };
     audioService.playSuccess();
   }, []);
 
@@ -204,6 +208,17 @@ const App: React.FC = () => {
 
     const player = playerRef.current;
     const now = performance.now();
+
+    // DELTA TIME CALCULATION
+    const dt = (now - lastTimeRef.current) / 1000;
+    lastTimeRef.current = now;
+    // Clamp to max 50ms (prevents huge jumps after tab switch)
+    const clampedDt = Math.min(dt, 0.05);
+    // Time scale relative to 60FPS (16.6ms)
+    const timeScale = clampedDt / (1 / 60);
+
+    // Save previous position for tunneling checks
+    player.prevPos = { ...player.pos };
 
     // Movement
     if (keys.current['ArrowLeft'] || keys.current['a'] || keys.current['A']) {
@@ -295,18 +310,32 @@ const App: React.FC = () => {
             player.pos.x = block.pos.x + block.width;
           }
         }
+      } else {
+        // Anti-tunneling: Check if we passed through a floor
+        // Condition: previous Bottom was <= block Top, AND current Bottom >= block Top
+        // AND x overlap exists
+        if (
+          player.prevPos.y + player.height <= block.pos.y &&
+          player.pos.y + player.height >= block.pos.y &&
+          player.pos.x < block.pos.x + block.width &&
+          player.pos.x + player.width > block.pos.x
+        ) {
+          player.pos.y = block.pos.y - player.height;
+          player.vel.y = 0;
+          player.grounded = true;
+        }
       }
     });
 
     // Enemy logic
     enemiesRef.current.forEach(enemy => {
       if (enemy.isDead) {
-        enemy.deadTimer++;
+        enemy.deadTimer += timeScale; // Scale animation timer
         return;
       }
 
       // Patrol
-      enemy.pos.x += enemy.vel.x;
+      enemy.pos.x += enemy.vel.x * timeScale;
       if (enemy.pos.x < 0 || enemy.pos.x + enemy.width > CANVAS_WIDTH) {
         enemy.vel.x *= -1;
         enemy.facing = enemy.vel.x > 0 ? 1 : -1;
@@ -332,6 +361,7 @@ const App: React.FC = () => {
 
             // Apply penalty/reset immediately
             player.pos = { x: 200, y: 904 };
+            player.prevPos = { x: 200, y: 904 };
             player.vel = { x: 0, y: 0 };
             audioService.playIncorrect();
 
@@ -355,7 +385,7 @@ const App: React.FC = () => {
       player.lastGroundedTime = now;
     }
 
-    if (player.pos.y > CANVAS_HEIGHT && now - player.lastHitTime > INVULNERABILITY_TIME) {
+    if (player.pos.y > CANVAS_HEIGHT + 64 && now - player.lastHitTime > INVULNERABILITY_TIME) {
       // Pit logic
       player.lastHitTime = now;
       player.pos = { x: 200, y: 904 };
