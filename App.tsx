@@ -5,11 +5,16 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, TILE_SIZE, COLORS, GRAVITY, JUMP_STRENGTH,
 import { fetchQuestions } from './services/geminiService';
 import { audioService } from './services/audioService';
 import GameUI from './components/GameUI';
+import { drawPlayer } from './renderers/PlayerRenderer';
+import { drawEnemy } from './renderers/EnemyRenderer';
+import { drawEnvironment } from './renderers/EnvironmentRenderer';
+import { useInput } from './hooks/useInput';
 
 const COYOTE_TIME = 150; // ms
 const ENEMY_SPEED = 2.0;
 const INITIAL_LIVES = 3;
 const INVULNERABILITY_TIME = 1000;
+
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
@@ -52,37 +57,7 @@ const App: React.FC = () => {
 
   const blocksRef = useRef<Block[]>([]);
   const enemiesRef = useRef<Enemy[]>([]);
-  const keys = useRef<{ [key: string]: boolean }>({});
 
-  const MARIO_PIXELS = [
-    "____RRRRR___",
-    "___RRRRRRRRR",
-    "___MMMSSSMS_",
-    "__MSMS SSSMS",
-    "__MSMM SSSMS",
-    "__MMSSSSMMMM",
-    "____SSSSSSS_",
-    "___RRBRRR___",
-    "__RRRBRRBRR_",
-    "_RRRRBBBBRRR",
-    "SSRBWBBWBRSS",
-    "SS SBBBBBBSS",
-    "S SBBBBBBBB S",
-    "___BBB__BBB_",
-    "__MMM____MMM",
-    "_MMMM____MMMM"
-  ];
-
-  const GOOMBA_PIXELS = [
-    "____BBBB____",
-    "___BBBBBB___",
-    "__BBBBBBBB__",
-    "_BBWWBBWWBB_",
-    "_BBWWBWWBWBB_",
-    "_BBBBBBBBBB_",
-    "__BBBBBBBB__",
-    "___MM__MM___"
-  ];
 
   const initLevel = useCallback((question: Question) => {
     const blocks: Block[] = [];
@@ -202,8 +177,24 @@ const App: React.FC = () => {
     setTimeout(() => setGameState(GameState.PLAYING), 500);
   };
 
+  const handlePause = () => {
+    if (gameState === GameState.PLAYING) {
+      setGameState(GameState.PAUSED);
+    }
+  };
+
+  const handleResume = () => {
+    if (gameState === GameState.PAUSED) {
+      setGameState(GameState.PLAYING);
+    }
+  };
+
+  // Initialize input handling hook after handlers are defined
+  const keysInput = useInput({ gameState, onPause: handlePause, onResume: handleResume });
+
   const update = useCallback(() => {
     const currentState = gameStateRef.current;
+    // Skip updates when paused
     if (currentState !== GameState.PLAYING && currentState !== GameState.SUCCESS) return;
 
     const player = playerRef.current;
@@ -221,10 +212,10 @@ const App: React.FC = () => {
     player.prevPos = { ...player.pos };
 
     // Movement
-    if (keys.current['ArrowLeft'] || keys.current['a'] || keys.current['A']) {
+    if (keysInput.current['ArrowLeft'] || keysInput.current['a'] || keysInput.current['A']) {
       player.vel.x = -MOVE_SPEED;
       player.facing = -1;
-    } else if (keys.current['ArrowRight'] || keys.current['d'] || keys.current['D']) {
+    } else if (keysInput.current['ArrowRight'] || keysInput.current['d'] || keysInput.current['D']) {
       player.vel.x = MOVE_SPEED;
       player.facing = 1;
     } else {
@@ -233,7 +224,7 @@ const App: React.FC = () => {
 
     // Jump Logic
     const canJump = player.grounded || (now - player.lastGroundedTime < COYOTE_TIME);
-    const jumpPressed = keys.current['ArrowUp'] || keys.current['w'] || keys.current['W'] || keys.current[' '];
+    const jumpPressed = keysInput.current['ArrowUp'] || keysInput.current['w'] || keysInput.current['W'] || keysInput.current[' '];
 
     if (jumpPressed && canJump) {
       player.vel.y = JUMP_STRENGTH;
@@ -402,101 +393,12 @@ const App: React.FC = () => {
     }
   }, [initLevel, spawnCastleLevel]); // Dependencies reduced significantly
 
-  const drawPlayer = (ctx: CanvasRenderingContext2D) => {
-    const p = playerRef.current;
-    const pixelSize = 6;
-    const startX = p.pos.x + (p.width - (12 * pixelSize)) / 2;
-    const startY = p.pos.y;
-
-    ctx.save();
-    MARIO_PIXELS.forEach((row, y) => {
-      for (let x = 0; x < row.length; x++) {
-        const char = row[x];
-        if (char === '_') continue;
-        let color = '#000';
-        switch (char) {
-          case 'R': color = '#FF0000'; break;
-          case 'B': color = '#0000FF'; break;
-          case 'S': color = '#FFCC99'; break;
-          case 'M': color = '#4B2E0B'; break;
-          case 'W': color = '#FFFFFF'; break;
-        }
-        ctx.fillStyle = color;
-        const drawX = p.facing === 1 ? startX + x * pixelSize : startX + (11 - x) * pixelSize;
-        ctx.fillRect(drawX, startY + y * pixelSize, pixelSize, pixelSize);
-      }
-    });
-    ctx.restore();
-  };
-
-  const drawEnemy = (ctx: CanvasRenderingContext2D, enemy: Enemy) => {
-    const pixelSize = enemy.isDead ? 3 : 6;
-    const startX = enemy.pos.x;
-    const startY = enemy.isDead ? enemy.pos.y + 32 : enemy.pos.y;
-
-    GOOMBA_PIXELS.forEach((row, y) => {
-      for (let x = 0; x < row.length; x++) {
-        const char = row[x];
-        if (char === '_') continue;
-        let color = '#000';
-        switch (char) {
-          case 'B': color = '#8B4513'; break;
-          case 'W': color = '#FFFFFF'; break;
-          case 'M': color = '#000000'; break;
-        }
-        ctx.fillStyle = color;
-        ctx.fillRect(startX + x * pixelSize, startY + y * pixelSize, pixelSize, pixelSize);
-      }
-    });
-  };
-
-  const drawEnvironment = (ctx: CanvasRenderingContext2D) => {
-    // Static background elements
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    [{ x: 160, y: 100 }, { x: 700, y: 200 }, { x: 1200, y: 80 }, { x: 1600, y: 160 }].forEach(cloud => {
-      ctx.beginPath();
-      ctx.arc(cloud.x, cloud.y, 30, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 30, cloud.y - 16, 50, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 60, cloud.y, 30, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    [{ x: 300, y: 160 }, { x: 900, y: 240 }, { x: 1500, y: 120 }].forEach(cloud => {
-      ctx.beginPath();
-      ctx.arc(cloud.x, cloud.y, 50, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 50, cloud.y - 20, 70, 0, Math.PI * 2);
-      ctx.arc(cloud.x + 100, cloud.y, 50, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = '#3E8E58';
-    [{ x: 200, w: 600, h: 240 }, { x: 1000, w: 800, h: 360 }, { x: 1700, w: 500, h: 180 }].forEach(hill => {
-      ctx.beginPath();
-      ctx.ellipse(hill.x, CANVAS_HEIGHT - TILE_SIZE, hill.w / 2, hill.h, 0, Math.PI, 0);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = '#4FB06D';
-    [{ x: 500, w: 400, h: 160 }, { x: 1300, w: 500, h: 220 }].forEach(hill => {
-      ctx.beginPath();
-      ctx.ellipse(hill.x, CANVAS_HEIGHT - TILE_SIZE, hill.w / 2, hill.h, 0, Math.PI, 0);
-      ctx.fill();
-    });
-
-    ctx.fillStyle = '#228B22';
-    [{ x: 100, w: 120 }, { x: 600, w: 160 }, { x: 1100, w: 100 }, { x: 1560, w: 140 }].forEach(bush => {
-      ctx.beginPath();
-      ctx.arc(bush.x, CANVAS_HEIGHT - TILE_SIZE, bush.w / 2, Math.PI, 0);
-      ctx.fill();
-    });
-  };
 
   const draw = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.fillStyle = COLORS.SKY;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    drawEnvironment(ctx);
+    drawEnvironment(ctx, CANVAS_HEIGHT, TILE_SIZE);
 
     blocksRef.current.forEach(block => {
       if (block.type === 'FLOOR') {
@@ -546,32 +448,27 @@ const App: React.FC = () => {
     enemiesRef.current.forEach(enemy => drawEnemy(ctx, enemy));
 
     if (gameStateRef.current !== GameState.GAMEOVER) {
-      drawPlayer(ctx);
+      drawPlayer(ctx, playerRef.current);
     }
   }, []); // Constant draw function
 
-  const loop = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    update();
-    draw(ctx);
-    requestRef.current = requestAnimationFrame(loop);
-  }, [update, draw]);
-
+  // Game loop
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => { keys.current[e.key] = true; };
-    const handleKeyUp = (e: KeyboardEvent) => { keys.current[e.key] = false; };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
+    const loop = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      update();
+      draw(ctx);
+      requestRef.current = requestAnimationFrame(loop);
+    };
+
     requestRef.current = requestAnimationFrame(loop);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [loop]);
+  }, [update, draw]);
 
   return (
     <div className="flex items-center justify-center w-screen h-screen bg-neutral-900 overflow-hidden relative">
@@ -589,6 +486,8 @@ const App: React.FC = () => {
           currentQuestionIndex={currentQuestionIndex}
           onStart={handleStart}
           onStartOffline={handleStartOffline}
+          onPause={handlePause}
+          onResume={handleResume}
           feedback={feedback}
           score={currentQuestionIndex * 100}
           totalQuestions={questions.length}
