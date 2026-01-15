@@ -100,7 +100,7 @@ const App: React.FC = () => {
     }
 
     // Question Blocks
-    const centerX = CANVAS_WIDTH / 2;
+    const centerX = CANVAS_WIDTH / 2 + 300; // Offset to the right so player doesn't spawn below blocks
     const blockSpacing = 360;
     question.options.forEach((opt, idx) => {
       blocks.push({
