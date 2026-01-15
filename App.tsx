@@ -345,9 +345,8 @@ const App: React.FC = () => {
           player.vel.y = JUMP_STRENGTH * 0.6; // Bounce
           audioService.playStomp();
         } else {
-          // Hit from side - Enemy also dies when it hits player
+          // Hit from side - Player loses life, enemy survives (classic Mario behavior)
           if (now - player.lastHitTime > INVULNERABILITY_TIME) {
-            enemy.isDead = true;
             player.lastHitTime = now;
 
             // Apply penalty/reset immediately
