@@ -7,7 +7,6 @@ interface GameUIProps {
   currentQuestion?: Question;
   currentQuestionIndex?: number;
   onStart: (topic: string, difficulty?: 'easy' | 'medium' | 'hard') => void;
-  onStartOffline: () => void;
   onPause?: () => void;
   onResume?: () => void;
   feedback: string | null;
@@ -27,7 +26,6 @@ const GameUI: React.FC<GameUIProps> = ({
   currentQuestion,
   currentQuestionIndex = 0,
   onStart,
-  onStartOffline,
   onPause,
   onResume,
   feedback,
@@ -130,12 +128,6 @@ const GameUI: React.FC<GameUIProps> = ({
             className="w-full bg-red-600 hover:bg-red-700 text-white p-6 text-3xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all mb-6"
           >
             START GAME
-          </button>
-          <button
-            onClick={onStartOffline}
-            className="w-full bg-green-600 hover:bg-green-700 text-white p-5 text-xl border-b-8 border-green-900 active:border-b-0 active:translate-y-2 transition-all"
-          >
-            🎮 OFFLINE MODE (DEV)
           </button>
         </div>
         <div className="mt-20 text-center">

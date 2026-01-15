@@ -178,38 +178,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartOffline = () => {
-    setGameState(GameState.LOADING);
-    setLives(INITIAL_LIVES);
-
-    // Offline development mode questions
-    const offlineQuestions: Question[] = [
-      {
-        id: 1,
-        text: "What is the capital of France?",
-        options: ["London", "Paris", "Berlin", "Madrid"],
-        correctAnswer: "Paris"
-      },
-      {
-        id: 2,
-        text: "What is 5 × 7?",
-        options: ["30", "35", "40", "45"],
-        correctAnswer: "35"
-      },
-      {
-        id: 3,
-        text: "Which planet is known as the Red Planet?",
-        options: ["Venus", "Mars", "Jupiter", "Saturn"],
-        correctAnswer: "Mars"
-      }
-    ];
-
-    setQuestions(offlineQuestions);
-    setCurrentQuestionIndex(0);
-    initLevel(offlineQuestions[0]);
-    setTimeout(() => setGameState(GameState.PLAYING), 500);
-  };
-
   const handlePause = () => {
     if (gameState === GameState.PLAYING) {
       setGameState(GameState.PAUSED);
@@ -558,7 +526,6 @@ const App: React.FC = () => {
           currentQuestion={questions[currentQuestionIndex]}
           currentQuestionIndex={currentQuestionIndex}
           onStart={handleStart}
-          onStartOffline={handleStartOffline}
           onPause={handlePause}
           onResume={handleResume}
           feedback={feedback}
