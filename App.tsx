@@ -14,6 +14,7 @@ const COYOTE_TIME = 150; // ms
 const ENEMY_SPEED = 2.0;
 const INITIAL_LIVES = 3;
 const INVULNERABILITY_TIME = 1000;
+const RESPAWN_DELAY = 1000; // ms - time player cannot control character after respawn
 
 
 const App: React.FC = () => {
@@ -59,7 +60,10 @@ const App: React.FC = () => {
     lastGroundedTime: 0,
     facing: 1 as 1 | -1,
     lastHitTime: 0,
-    prevPos: { x: 200, y: 904 }
+    prevPos: { x: 200, y: 904 },
+    respawnTime: 0,
+    isHit: false,
+    hitAnimationTimer: 0
   });
 
   const blocksRef = useRef<Block[]>([]);
@@ -234,29 +238,37 @@ const App: React.FC = () => {
     player.prevPos = { ...player.pos };
 
     // === INPUT HANDLING ===
-    if (keysInput.current['ArrowLeft'] || keysInput.current['a'] || keysInput.current['A']) {
-      player.vel.x = -MOVE_SPEED;
-      player.facing = -1;
-    } else if (keysInput.current['ArrowRight'] || keysInput.current['d'] || keysInput.current['D']) {
-      player.vel.x = MOVE_SPEED;
-      player.facing = 1;
+    // Block input during respawn delay
+    const isRespawning = now - player.respawnTime < RESPAWN_DELAY;
+
+    if (!isRespawning) {
+      if (keysInput.current['ArrowLeft'] || keysInput.current['a'] || keysInput.current['A']) {
+        player.vel.x = -MOVE_SPEED;
+        player.facing = -1;
+      } else if (keysInput.current['ArrowRight'] || keysInput.current['d'] || keysInput.current['D']) {
+        player.vel.x = MOVE_SPEED;
+        player.facing = 1;
+      } else {
+        player.vel.x *= 0.8;
+      }
+
+      // Jump Logic
+      const canJump = player.grounded || (now - player.lastGroundedTime < COYOTE_TIME);
+      const jumpPressed = keysInput.current['ArrowUp'] || keysInput.current['w'] || keysInput.current['W'] || keysInput.current[' '];
+
+      if (jumpPressed && canJump) {
+        player.vel.y = JUMP_STRENGTH;
+        player.grounded = false;
+        player.lastGroundedTime = 0;
+        audioService.playJump();
+      }
+
+      if (!jumpPressed && player.vel.y < 0) {
+        player.vel.y *= 0.5;
+      }
     } else {
+      // During respawn delay, gradually slow down any existing velocity
       player.vel.x *= 0.8;
-    }
-
-    // Jump Logic
-    const canJump = player.grounded || (now - player.lastGroundedTime < COYOTE_TIME);
-    const jumpPressed = keysInput.current['ArrowUp'] || keysInput.current['w'] || keysInput.current['W'] || keysInput.current[' '];
-
-    if (jumpPressed && canJump) {
-      player.vel.y = JUMP_STRENGTH;
-      player.grounded = false;
-      player.lastGroundedTime = 0;
-      audioService.playJump();
-    }
-
-    if (!jumpPressed && player.vel.y < 0) {
-      player.vel.y *= 0.5;
     }
 
     // Apply gravity
@@ -401,10 +413,15 @@ const App: React.FC = () => {
           if (now - player.lastHitTime > INVULNERABILITY_TIME) {
             player.lastHitTime = now;
 
+            // Trigger hit animation
+            player.isHit = true;
+            player.hitAnimationTimer = 0;
+
             // Apply penalty/reset immediately
             player.pos = { x: 200, y: 904 };
             player.prevPos = { x: 200, y: 904 };
             player.vel = { x: 0, y: 0 };
+            player.respawnTime = now;
             audioService.playIncorrect();
 
             // Handle life loss
@@ -430,8 +447,14 @@ const App: React.FC = () => {
     if (player.pos.y > CANVAS_HEIGHT + 64 && now - player.lastHitTime > INVULNERABILITY_TIME) {
       // Pit logic
       player.lastHitTime = now;
+
+      // Trigger hit animation
+      player.isHit = true;
+      player.hitAnimationTimer = 0;
+
       player.pos = { x: 200, y: 904 };
       player.vel = { x: 0, y: 0 };
+      player.respawnTime = now;
       audioService.playIncorrect();
 
       setLives(prev => {
@@ -441,6 +464,16 @@ const App: React.FC = () => {
         }
         return nextLives;
       });
+    }
+
+    // Update hit animation timer
+    if (player.isHit) {
+      player.hitAnimationTimer += timeScale;
+      // End hit animation after invulnerability period
+      if (now - player.lastHitTime >= INVULNERABILITY_TIME) {
+        player.isHit = false;
+        player.hitAnimationTimer = 0;
+      }
     }
   }, [initLevel, spawnCastleLevel]); // Dependencies reduced significantly
 
@@ -523,7 +556,7 @@ const App: React.FC = () => {
     enemiesRef.current.forEach(enemy => drawEnemy(ctx, enemy));
 
     if (gameStateRef.current !== GameState.GAMEOVER) {
-      drawPlayer(ctx, playerRef.current);
+      drawPlayer(ctx, playerRef.current, performance.now() - playerRef.current.lastHitTime);
     }
   }, []); // Constant draw function
 
