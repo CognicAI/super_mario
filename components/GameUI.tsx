@@ -6,7 +6,7 @@ interface GameUIProps {
   gameState: GameState;
   currentQuestion?: Question;
   currentQuestionIndex?: number;
-  onStart: (topic: string) => void;
+  onStart: (topic: string, difficulty?: 'easy' | 'medium' | 'hard') => void;
   onStartOffline: () => void;
   onPause?: () => void;
   onResume?: () => void;
@@ -14,6 +14,12 @@ interface GameUIProps {
   score: number;
   totalQuestions: number;
   lives: number;
+  showHint: boolean;
+  onToggleHint: () => void;
+  showFunFact: boolean;
+  onDismissFunFact: () => void;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  onDifficultyChange: (difficulty: 'easy' | 'medium' | 'hard' | undefined) => void;
 }
 
 const GameUI: React.FC<GameUIProps> = ({
@@ -27,7 +33,13 @@ const GameUI: React.FC<GameUIProps> = ({
   feedback,
   score,
   totalQuestions,
-  lives
+  lives,
+  showHint,
+  onToggleHint,
+  showFunFact,
+  onDismissFunFact,
+  difficulty,
+  onDifficultyChange
 }) => {
   const [topic, setTopic] = React.useState('Procure to pay process');
   const [loadingDots, setLoadingDots] = React.useState(0);
@@ -42,20 +54,79 @@ const GameUI: React.FC<GameUIProps> = ({
     }
   }, [gameState]);
 
+  // Keyboard handler for fun fact dismissal
+  React.useEffect(() => {
+    if (showFunFact) {
+      const handleKeyPress = (e: KeyboardEvent) => {
+        onDismissFunFact();
+      };
+
+      window.addEventListener('keydown', handleKeyPress);
+      return () => window.removeEventListener('keydown', handleKeyPress);
+    }
+  }, [showFunFact, onDismissFunFact]);
+
   if (gameState === GameState.MENU) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-12 z-50">
         <h1 className="text-7xl mb-16 text-yellow-400 text-center uppercase leading-relaxed">Super Mario<br />Quiz Quest</h1>
         <div className="w-full max-w-3xl">
-          <label className="block text-xl mb-4">ENTER A TOPIC:</label>
+          <label className="block text-xl mb-4">SELECT TOPIC:</label>
           <input
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            className="w-full bg-white text-black p-6 mb-10 font-inherit outline-none border-4 border-yellow-500 text-xl"
+            disabled
+            className="w-full bg-gray-400 text-gray-600 p-6 mb-2 font-inherit outline-none border-4 border-gray-500 text-xl cursor-not-allowed"
+            placeholder="Loading from database..."
           />
+          <p className="text-sm text-gray-400 mb-6">Questions are loaded from database for: <span className="text-yellow-400">{topic}</span></p>
+
+          {/* Difficulty Selector */}
+          <div className="mb-8">
+            <label className="block text-xl mb-4">SELECT DIFFICULTY:</label>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => onDifficultyChange(undefined)}
+                className={`px-8 py-4 text-lg font-bold rounded border-b-4 transition-all ${difficulty === undefined
+                  ? 'bg-yellow-500 text-black border-yellow-700'
+                  : 'bg-gray-600 text-white border-gray-800 hover:bg-gray-500'
+                  }`}
+              >
+                ALL
+              </button>
+              <button
+                onClick={() => onDifficultyChange('easy')}
+                className={`px-8 py-4 text-lg font-bold rounded border-b-4 transition-all ${difficulty === 'easy'
+                  ? 'bg-green-500 text-black border-green-700'
+                  : 'bg-gray-600 text-white border-gray-800 hover:bg-gray-500'
+                  }`}
+              >
+                EASY
+              </button>
+              <button
+                onClick={() => onDifficultyChange('medium')}
+                className={`px-8 py-4 text-lg font-bold rounded border-b-4 transition-all ${difficulty === 'medium'
+                  ? 'bg-orange-500 text-black border-orange-700'
+                  : 'bg-gray-600 text-white border-gray-800 hover:bg-gray-500'
+                  }`}
+              >
+                MEDIUM
+              </button>
+              <button
+                onClick={() => onDifficultyChange('hard')}
+                className={`px-8 py-4 text-lg font-bold rounded border-b-4 transition-all ${difficulty === 'hard'
+                  ? 'bg-red-500 text-black border-red-700'
+                  : 'bg-gray-600 text-white border-gray-800 hover:bg-gray-500'
+                  }`}
+              >
+                HARD
+              </button>
+            </div>
+          </div>
+
           <button
-            onClick={() => onStart(topic)}
+            onClick={() => onStart(topic, difficulty)}
             className="w-full bg-red-600 hover:bg-red-700 text-white p-6 text-3xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all mb-6"
           >
             START GAME
@@ -78,20 +149,20 @@ const GameUI: React.FC<GameUIProps> = ({
   if (gameState === GameState.LOADING) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-sky-500 text-white z-50">
-        <div className="text-5xl mb-8">GENERATING LEVEL{'.'.repeat(loadingDots)}</div>
+        <div className="text-5xl mb-8">LOADING QUESTIONS{'.'.repeat(loadingDots)}</div>
         <div className="flex gap-3 mb-8">
           <div className="w-4 h-4 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
           <div className="w-4 h-4 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
           <div className="w-4 h-4 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
         </div>
-        <p className="text-xl text-white/80">Connecting to AI...</p>
-        <p className="text-sm text-white/60 mt-4">This may take a few seconds</p>
+        <p className="text-xl text-white/80">Fetching from database...</p>
+        <p className="text-sm text-white/60 mt-4">This should be quick!</p>
       </div>
     );
   }
 
-  // Pause Screen
-  if (gameState === GameState.PAUSED) {
+  // Pause Screen (only show if not showing hint)
+  if (gameState === GameState.PAUSED && !showHint) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-50">
         <h2 className="text-7xl mb-12 text-yellow-400 uppercase">Paused</h2>
@@ -133,6 +204,16 @@ const GameUI: React.FC<GameUIProps> = ({
           <div className="bg-white/10 backdrop-blur-sm p-6 border-2 border-white rounded shadow-lg text-xl leading-7">
             {currentQuestion?.text}
           </div>
+
+          {/* Hint Button */}
+          {currentQuestion?.hint && !showHint && (
+            <button
+              onClick={onToggleHint}
+              className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-black px-6 py-3 text-lg font-bold rounded border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all pointer-events-auto uppercase"
+            >
+              💡 Need a Hint?
+            </button>
+          )}
         </div>
         <div>
           <div className="text-yellow-300 mb-2 text-xl">WORLD</div>
@@ -145,6 +226,42 @@ const GameUI: React.FC<GameUIProps> = ({
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
           <div className={`text-8xl font-bold uppercase ${feedback === 'CORRECT!' ? 'text-green-500' : 'text-red-500'} drop-shadow-lg animate-bounce`}>
             {feedback}
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Hint Display */}
+      {showHint && currentQuestion?.hint && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-50 pointer-events-auto">
+          <div className="max-w-4xl p-12 text-center">
+            <div className="text-6xl mb-8">💡</div>
+            <h2 className="text-5xl mb-8 text-yellow-400 uppercase">Hint</h2>
+            <div className="bg-yellow-100 text-black p-10 rounded-lg shadow-2xl text-3xl leading-relaxed mb-12">
+              {currentQuestion.hint}
+            </div>
+            <button
+              onClick={onToggleHint}
+              className="bg-green-600 hover:bg-green-700 text-white px-12 py-6 text-3xl border-b-8 border-green-900 active:border-b-0 active:translate-y-2 transition-all uppercase"
+            >
+              Close & Resume (ESC)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fun Fact Display - Click or Press Any Key to Dismiss */}
+      {showFunFact && currentQuestion?.funFact && feedback === 'CORRECT!' && (
+        <div
+          onClick={onDismissFunFact}
+          className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 pointer-events-auto cursor-pointer"
+        >
+          <div className="max-w-5xl p-12 text-center">
+            <div className="text-8xl mb-6 animate-bounce">🎉</div>
+            <h2 className="text-6xl mb-8 text-yellow-400 uppercase">Fun Fact!</h2>
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-12 rounded-lg shadow-2xl border-4 border-white text-3xl leading-relaxed mb-8">
+              {currentQuestion.funFact}
+            </div>
+            <p className="text-2xl text-gray-300 animate-pulse">Click anywhere or press any key to continue</p>
           </div>
         </div>
       )}

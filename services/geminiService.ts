@@ -6,7 +6,11 @@ export async function fetchQuestions(topic: string): Promise<Question[]> {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
   const prompt = `Generate 5 challenging multiple-choice questions about the topic: "${topic}". 
-  Each question must have exactly 4 options. Return the data in valid JSON format.`;
+  Each question must have exactly 4 options.
+  For each question, also provide:
+  - A helpful hint (not too obvious, but guides the player)
+  - A fun fact related to the question or answer
+  Return the data in valid JSON format.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -25,9 +29,11 @@ export async function fetchQuestions(topic: string): Promise<Question[]> {
                 type: Type.ARRAY,
                 items: { type: Type.STRING }
               },
-              correctAnswer: { type: Type.STRING }
+              correctAnswer: { type: Type.STRING },
+              hint: { type: Type.STRING },
+              funFact: { type: Type.STRING }
             },
-            required: ['id', 'text', 'options', 'correctAnswer']
+            required: ['id', 'text', 'options', 'correctAnswer', 'hint', 'funFact']
           }
         }
       }

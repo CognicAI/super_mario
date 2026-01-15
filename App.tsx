@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameState, Question, Block, Enemy, Vector2D } from './types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, TILE_SIZE, COLORS, GRAVITY, JUMP_STRENGTH, MOVE_SPEED } from './constants';
-import { fetchQuestions } from './services/geminiService';
+import { getRandomQuestions } from './services/databaseService';
 import { audioService } from './services/audioService';
 import GameUI from './components/GameUI';
 import { drawPlayer } from './renderers/PlayerRenderer';
@@ -22,6 +22,9 @@ const App: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [lives, setLives] = useState(INITIAL_LIVES);
+  const [showHint, setShowHint] = useState(false);
+  const [showFunFact, setShowFunFact] = useState(false);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | undefined>(undefined);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(undefined);
@@ -33,6 +36,8 @@ const App: React.FC = () => {
   const currentQuestionIndexRef = useRef(currentQuestionIndex);
   const feedbackRef = useRef(feedback);
   const livesRef = useRef(lives);
+  const showHintRef = useRef(showHint);
+  const showFunFactRef = useRef(showFunFact);
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -40,7 +45,9 @@ const App: React.FC = () => {
     currentQuestionIndexRef.current = currentQuestionIndex;
     feedbackRef.current = feedback;
     livesRef.current = lives;
-  }, [gameState, questions, currentQuestionIndex, feedback, lives]);
+    showHintRef.current = showHint;
+    showFunFactRef.current = showFunFact;
+  }, [gameState, questions, currentQuestionIndex, feedback, lives, showHint, showFunFact]);
 
   // Game entities
   const playerRef = useRef({
@@ -89,7 +96,16 @@ const App: React.FC = () => {
       });
     });
 
-    // Spawn 1-2 Goombas per level
+    // Add pipe barrier between player and enemy zone
+    blocks.push({
+      type: 'PIPE',
+      pos: { x: 350, y: CANVAS_HEIGHT - TILE_SIZE - 128 },
+      vel: { x: 0, y: 0 },
+      width: 96,
+      height: 128
+    });
+
+    // Enemy - starts on the right, patrols within safe zone
     enemies.push({
       type: 'GOOMBA',
       pos: { x: CANVAS_WIDTH - 300, y: CANVAS_HEIGHT - TILE_SIZE - 64 },
@@ -133,15 +149,32 @@ const App: React.FC = () => {
     audioService.playSuccess();
   }, []);
 
-  const handleStart = async (topic: string) => {
+  const handleStart = async (topic: string, selectedDifficulty?: 'easy' | 'medium' | 'hard') => {
     setGameState(GameState.LOADING);
     setLives(INITIAL_LIVES);
-    const fetched = await fetchQuestions(topic);
-    setQuestions(fetched);
-    if (fetched.length > 0) {
+    setDifficulty(selectedDifficulty);
+
+    try {
+      // Fetch ALL questions from database with optional difficulty filter
+      const fetched = await getRandomQuestions(100, topic, selectedDifficulty); // Fetch up to 100 questions
+
+      if (fetched.length === 0) {
+        const difficultyMsg = selectedDifficulty ? ` (${selectedDifficulty} difficulty)` : '';
+        alert(`No questions found for topic: "${topic}"${difficultyMsg}. Please try a different topic or add questions to the database first.`);
+        setGameState(GameState.MENU);
+        return;
+      }
+
+      setQuestions(fetched);
       setCurrentQuestionIndex(0);
+      setShowHint(false);
+      setShowFunFact(false);
       initLevel(fetched[0]);
       setGameState(GameState.PLAYING);
+    } catch (error) {
+      console.error('Error loading questions from database:', error);
+      alert('Failed to load questions from database. Please check your connection.');
+      setGameState(GameState.MENU);
     }
   };
 
@@ -189,13 +222,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDismissFunFact = () => {
+    setFeedback(null);
+    setShowFunFact(false);
+    setShowHint(false);
+
+    if (currentQuestionIndex + 1 < questions.length) {
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+      initLevel(questions[nextIndex]);
+    } else {
+      setGameState(GameState.SUCCESS);
+      spawnCastleLevel();
+    }
+  };
+
+  const handleToggleHint = () => {
+    // Just toggle hint - the update loop will skip when hint is showing
+    setShowHint(!showHint);
+  };
+
   // Initialize input handling hook after handlers are defined
   const keysInput = useInput({ gameState, onPause: handlePause, onResume: handleResume });
 
   const update = useCallback(() => {
     const currentState = gameStateRef.current;
-    // Skip updates when paused
+    // Skip updates when paused, or when hint/fun fact is showing
     if (currentState !== GameState.PLAYING && currentState !== GameState.SUCCESS) return;
+    if (showHintRef.current || showFunFactRef.current) return; // Pause game when hint or fun fact is visible
 
     const player = playerRef.current;
     const now = performance.now();
@@ -272,18 +326,9 @@ const App: React.FC = () => {
               const currentQ = questionsRef.current[currentQuestionIndexRef.current];
               if (block.label === currentQ.correctAnswer) {
                 setFeedback('CORRECT!');
+                setShowFunFact(true); // Show fun fact - stays until clicked
                 audioService.playCorrect();
-                setTimeout(() => {
-                  setFeedback(null);
-                  if (currentQuestionIndexRef.current + 1 < questionsRef.current.length) {
-                    const nextIndex = currentQuestionIndexRef.current + 1;
-                    setCurrentQuestionIndex(nextIndex);
-                    initLevel(questionsRef.current[nextIndex]);
-                  } else {
-                    setGameState(GameState.SUCCESS);
-                    spawnCastleLevel();
-                  }
-                }, 1000);
+                // Don't auto-advance - wait for user to dismiss fun fact
               } else {
                 setFeedback('TRY AGAIN!');
                 audioService.playIncorrect();
@@ -325,9 +370,14 @@ const App: React.FC = () => {
         return;
       }
 
-      // Patrol
+      // Patrol within safe boundaries (don't go too far left to player spawn)
+      const MIN_ENEMY_X = 400; // Keep enemy away from player spawn area
+      const MAX_ENEMY_X = CANVAS_WIDTH;
+
       enemy.pos.x += enemy.vel.x * timeScale;
-      if (enemy.pos.x < 0 || enemy.pos.x + enemy.width > CANVAS_WIDTH) {
+
+      // Bounce at boundaries
+      if (enemy.pos.x < MIN_ENEMY_X || enemy.pos.x + enemy.width > MAX_ENEMY_X) {
         enemy.vel.x *= -1;
         enemy.facing = enemy.vel.x > 0 ? 1 : -1;
       }
@@ -400,47 +450,71 @@ const App: React.FC = () => {
     drawEnvironment(ctx, CANVAS_HEIGHT, TILE_SIZE);
 
     blocksRef.current.forEach(block => {
-      if (block.type === 'FLOOR') {
-        ctx.fillStyle = COLORS.DIRT;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-        ctx.fillStyle = COLORS.GRASS;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, 8);
-      } else if (block.type === 'QUESTION') {
-        ctx.fillStyle = block.isHit ? COLORS.HIT_BLOCK : COLORS.QUESTION_BLOCK;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
+      switch (block.type) {
+        case 'FLOOR':
+          ctx.fillStyle = COLORS.DIRT;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          ctx.fillStyle = COLORS.GRASS;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, 8);
+          break;
 
-        if (!block.isHit) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-          ctx.strokeRect(block.pos.x + 4, block.pos.y + 4, block.width - 8, block.height - 8);
-          ctx.fillStyle = '#000';
-          ctx.font = 'bold 48px Arial';
+        case 'PIPE':
+          // Green pipe body
+          ctx.fillStyle = '#2ECC40';
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          // Pipe rim (top)
+          ctx.fillStyle = '#01FF70';
+          ctx.fillRect(block.pos.x - 8, block.pos.y, block.width + 16, 16);
+          // Pipe outline
+          ctx.strokeStyle = '#1a8c26';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
+          // Vertical line in middle
+          ctx.beginPath();
+          ctx.moveTo(block.pos.x + block.width / 2, block.pos.y + 16);
+          ctx.lineTo(block.pos.x + block.width / 2, block.pos.y + block.height);
+          ctx.stroke();
+          break;
+
+        case 'QUESTION':
+          ctx.fillStyle = block.isHit ? COLORS.HIT_BLOCK : COLORS.QUESTION_BLOCK;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
+
+          if (!block.isHit) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.strokeRect(block.pos.x + 4, block.pos.y + 4, block.width - 8, block.height - 8);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('?', block.pos.x + block.width / 2, block.pos.y + 38);
+          }
+
+          ctx.fillStyle = '#fff';
+          ctx.font = '18px "Press Start 2P"';
           ctx.textAlign = 'center';
-          ctx.fillText('?', block.pos.x + block.width / 2, block.pos.y + 38);
-        }
+          const words = block.label?.split(' ') || [];
+          const lines: string[] = [];
+          let currentLine = "";
+          words.forEach(word => {
+            if ((currentLine + word).length < 15) currentLine += (currentLine ? " " : "") + word;
+            else { lines.push(currentLine); currentLine = word; }
+          });
+          lines.push(currentLine);
+          lines.reverse().forEach((line, i) => {
+            ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 10 - i * 20);
+          });
+          break;
 
-        ctx.fillStyle = '#fff';
-        ctx.font = '18px "Press Start 2P"';
-        ctx.textAlign = 'center';
-        const words = block.label?.split(' ') || [];
-        const lines: string[] = [];
-        let currentLine = "";
-        words.forEach(word => {
-          if ((currentLine + word).length < 15) currentLine += (currentLine ? " " : "") + word;
-          else { lines.push(currentLine); currentLine = word; }
-        });
-        lines.push(currentLine);
-        lines.reverse().forEach((line, i) => {
-          ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - (i * 24));
-        });
-      } else if (block.type === 'CASTLE') {
-        ctx.fillStyle = COLORS.CASTLE;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(block.pos.x + block.width / 2 - 15, block.pos.y + block.height - 40, 30, 40);
-        for (let i = 0; i < 4; i++) ctx.fillRect(block.pos.x + i * 35, block.pos.y - 20, 15, 20);
+        case 'CASTLE':
+          ctx.fillStyle = COLORS.CASTLE;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          ctx.fillStyle = '#000';
+          ctx.fillRect(block.pos.x + block.width / 2 - 15, block.pos.y + block.height - 40, 30, 40);
+          for (let i = 0; i < 4; i++) ctx.fillRect(block.pos.x + i * 35, block.pos.y - 20, 15, 20);
+          break;
       }
     });
 
@@ -491,6 +565,12 @@ const App: React.FC = () => {
           score={currentQuestionIndex * 100}
           totalQuestions={questions.length}
           lives={lives}
+          showHint={showHint}
+          onToggleHint={handleToggleHint}
+          showFunFact={showFunFact}
+          onDismissFunFact={handleDismissFunFact}
+          difficulty={difficulty}
+          onDifficultyChange={setDifficulty}
         />
       </div>
     </div>
