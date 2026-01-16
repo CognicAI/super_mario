@@ -52,7 +52,7 @@ const App: React.FC = () => {
 
   // Game entities
   const playerRef = useRef({
-    pos: { x: 200, y: 904 },
+    pos: { x: 120, y: 904 },
     vel: { x: 0, y: 0 },
     width: 64,
     height: 96,
@@ -60,7 +60,7 @@ const App: React.FC = () => {
     lastGroundedTime: 0,
     facing: 1 as 1 | -1,
     lastHitTime: 0,
-    prevPos: { x: 200, y: 904 },
+    prevPos: { x: 120, y: 904 },
     respawnTime: 0,
     isHit: false,
     hitAnimationTimer: 0
@@ -103,7 +103,7 @@ const App: React.FC = () => {
     // Add pipe barrier between player and enemy zone
     blocks.push({
       type: 'PIPE',
-      pos: { x: 350, y: CANVAS_HEIGHT - TILE_SIZE - 128 },
+      pos: { x: 270, y: CANVAS_HEIGHT - TILE_SIZE - 128 },
       vel: { x: 0, y: 0 },
       width: 96,
       height: 128
@@ -123,8 +123,8 @@ const App: React.FC = () => {
 
     blocksRef.current = blocks;
     enemiesRef.current = enemies;
-    playerRef.current.pos = { x: 200, y: 904 };
-    playerRef.current.prevPos = { x: 200, y: 904 };
+    playerRef.current.pos = { x: 120, y: 904 };
+    playerRef.current.prevPos = { x: 120, y: 904 };
     playerRef.current.vel = { x: 0, y: 0 };
   }, []);
 
@@ -148,8 +148,8 @@ const App: React.FC = () => {
       height: 240
     });
     blocksRef.current = blocks;
-    playerRef.current.pos = { x: 200, y: 904 };
-    playerRef.current.prevPos = { x: 200, y: 904 };
+    playerRef.current.pos = { x: 120, y: 904 };
+    playerRef.current.prevPos = { x: 120, y: 904 };
     audioService.playSuccess();
   }, []);
 
@@ -382,10 +382,10 @@ const App: React.FC = () => {
       }
 
       // Patrol within safe boundaries (don't overlap with pipe or go to player spawn)
-      const PIPE_X = 350; // Assuming pipe starts at x=350
-      const PIPE_WIDTH = 96; // Assuming pipe width is 96
-      const PIPE_END = PIPE_X + PIPE_WIDTH; // Pipe x position + pipe width = 446
-      const MIN_ENEMY_X = PIPE_END + 20; // Add 20px buffer = 466
+      const PIPE_X = 270; // Pipe starts at x=270
+      const PIPE_WIDTH = 96; // Pipe width is 96
+      const PIPE_END = PIPE_X + PIPE_WIDTH; // Pipe x position + pipe width = 366
+      const MIN_ENEMY_X = PIPE_END + 20; // Add 20px buffer = 386
       const MAX_ENEMY_X = CANVAS_WIDTH;
 
       enemy.pos.x += enemy.vel.x * timeScale;
@@ -418,8 +418,8 @@ const App: React.FC = () => {
             player.hitAnimationTimer = 0;
 
             // Apply penalty/reset immediately
-            player.pos = { x: 200, y: 904 };
-            player.prevPos = { x: 200, y: 904 };
+            player.pos = { x: 120, y: 904 };
+            player.prevPos = { x: 120, y: 904 };
             player.vel = { x: 0, y: 0 };
             player.respawnTime = now;
             audioService.playIncorrect();
@@ -452,7 +452,7 @@ const App: React.FC = () => {
       player.isHit = true;
       player.hitAnimationTimer = 0;
 
-      player.pos = { x: 200, y: 904 };
+      player.pos = { x: 120, y: 904 };
       player.vel = { x: 0, y: 0 };
       player.respawnTime = now;
       audioService.playIncorrect();
@@ -512,24 +512,68 @@ const App: React.FC = () => {
           break;
 
         case 'QUESTION':
-          ctx.fillStyle = block.isHit ? COLORS.HIT_BLOCK : COLORS.QUESTION_BLOCK;
-          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 2;
-          ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
+          // Mario-style question block with orange color and rounded appearance
+          const blockColor = block.isHit ? COLORS.HIT_BLOCK : '#E89C3C'; // Orange color
+          const darkBorder = block.isHit ? '#404040' : '#C67A28'; // Darker orange border
+
+          // Draw main block with rounded corners effect
+          ctx.fillStyle = blockColor;
+          ctx.fillRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
+
+          // Draw darker border/outline
+          ctx.strokeStyle = darkBorder;
+          ctx.lineWidth = 4;
+          ctx.strokeRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
 
           if (!block.isHit) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            ctx.strokeRect(block.pos.x + 4, block.pos.y + 4, block.width - 8, block.height - 8);
+            // Add 3D beveled effect - top and left highlights
+            ctx.strokeStyle = '#FFD89C';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(block.pos.x + 6, block.pos.y + block.height - 6);
+            ctx.lineTo(block.pos.x + 6, block.pos.y + 6);
+            ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + 6);
+            ctx.stroke();
+
+            // Bottom and right shadows
+            ctx.strokeStyle = '#B87A28';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(block.pos.x + block.width - 6, block.pos.y + 6);
+            ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + block.height - 6);
+            ctx.lineTo(block.pos.x + 6, block.pos.y + block.height - 6);
+            ctx.stroke();
+
+            // Draw corner dots (classic Mario question block style)
+            ctx.fillStyle = '#B87A28';
+            const dotSize = 4;
+            const dotOffset = 12;
+            // Top-left dot
+            ctx.fillRect(block.pos.x + dotOffset, block.pos.y + dotOffset, dotSize, dotSize);
+            // Top-right dot
+            ctx.fillRect(block.pos.x + block.width - dotOffset - dotSize, block.pos.y + dotOffset, dotSize, dotSize);
+            // Bottom-left dot
+            ctx.fillRect(block.pos.x + dotOffset, block.pos.y + block.height - dotOffset - dotSize, dotSize, dotSize);
+            // Bottom-right dot
+            ctx.fillRect(block.pos.x + block.width - dotOffset - dotSize, block.pos.y + block.height - dotOffset - dotSize, dotSize, dotSize);
+
+            // Draw the letter (A, B, C, D)
             ctx.fillStyle = '#000';
             ctx.font = 'bold 48px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('?', block.pos.x + block.width / 2, block.pos.y + 38);
+            ctx.textBaseline = 'middle';
+            // Find the block index to determine which letter to display
+            const blockIndex = blocksRef.current.filter(b => b.type === 'QUESTION').indexOf(block);
+            const letter = String.fromCharCode(65 + blockIndex); // 65 is 'A' in ASCII
+            ctx.fillText(letter, block.pos.x + block.width / 2, block.pos.y + block.height / 2 + 2);
           }
 
           ctx.fillStyle = '#fff';
           ctx.font = '18px "Press Start 2P"';
           ctx.textAlign = 'center';
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.letterSpacing = '2px';  // Add spacing between letters
           const words = block.label?.split(' ') || [];
           const lines: string[] = [];
           let currentLine = "";
@@ -539,7 +583,10 @@ const App: React.FC = () => {
           });
           lines.push(currentLine);
           lines.reverse().forEach((line, i) => {
-            ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 10 - i * 20);
+            // Draw black outline first
+            ctx.strokeText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
+            // Then draw white fill on top
+            ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
           });
           break;
 
@@ -586,7 +633,7 @@ const App: React.FC = () => {
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
           className="w-full h-full"
-          style={{ imageRendering: 'pixelated' }}
+          style={{ imageRendering: 'auto' }}
         />
         <GameUI
           gameState={gameState}
