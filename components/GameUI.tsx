@@ -41,6 +41,8 @@ const GameUI: React.FC<GameUIProps> = ({
 }) => {
   const [topic, setTopic] = React.useState('Procure to pay process');
   const [loadingDots, setLoadingDots] = React.useState(0);
+  const [canDismissFunFact, setCanDismissFunFact] = React.useState(false);
+  const [remainingTime, setRemainingTime] = React.useState(2);
 
   // Animated loading dots
   React.useEffect(() => {
@@ -52,9 +54,38 @@ const GameUI: React.FC<GameUIProps> = ({
     }
   }, [gameState]);
 
-  // Keyboard handler for fun fact dismissal
+  // Fun fact delay timer - 2 seconds before allowing dismissal
   React.useEffect(() => {
     if (showFunFact) {
+      setCanDismissFunFact(false);
+      setRemainingTime(2);
+
+      // Countdown timer
+      const countdownInterval = setInterval(() => {
+        setRemainingTime(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownInterval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      // Enable dismissal after 2 seconds
+      const timer = setTimeout(() => {
+        setCanDismissFunFact(true);
+      }, 2000);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(countdownInterval);
+      };
+    }
+  }, [showFunFact]);
+
+  // Keyboard handler for fun fact dismissal
+  React.useEffect(() => {
+    if (showFunFact && canDismissFunFact) {
       const handleKeyPress = (e: KeyboardEvent) => {
         onDismissFunFact();
       };
@@ -62,7 +93,7 @@ const GameUI: React.FC<GameUIProps> = ({
       window.addEventListener('keydown', handleKeyPress);
       return () => window.removeEventListener('keydown', handleKeyPress);
     }
-  }, [showFunFact, onDismissFunFact]);
+  }, [showFunFact, canDismissFunFact, onDismissFunFact]);
 
   if (gameState === GameState.MENU) {
     return (
@@ -215,7 +246,7 @@ const GameUI: React.FC<GameUIProps> = ({
 
       {/* Feedback Alert */}
       {feedback && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none">
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center pointer-events-none z-50">
           <div className={`text-8xl font-bold uppercase ${feedback === 'CORRECT!' ? 'text-green-500' : 'text-red-500'} drop-shadow-lg animate-bounce`}>
             {feedback}
           </div>
@@ -244,8 +275,8 @@ const GameUI: React.FC<GameUIProps> = ({
       {/* Fun Fact Display - Click or Press Any Key to Dismiss */}
       {showFunFact && currentQuestion?.funFact && feedback === 'CORRECT!' && (
         <div
-          onClick={onDismissFunFact}
-          className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 pointer-events-auto cursor-pointer"
+          onClick={() => canDismissFunFact && onDismissFunFact()}
+          className={`absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 pointer-events-auto ${canDismissFunFact ? 'cursor-pointer' : 'cursor-wait'}`}
         >
           <div className="max-w-5xl p-12 text-center">
             <div className="text-8xl mb-6 animate-bounce">🎉</div>
@@ -253,7 +284,11 @@ const GameUI: React.FC<GameUIProps> = ({
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-12 rounded-lg shadow-2xl border-4 border-white text-3xl leading-relaxed mb-8">
               {currentQuestion.funFact}
             </div>
-            <p className="text-2xl text-gray-300 animate-pulse">Click anywhere or press any key to continue</p>
+            {canDismissFunFact ? (
+              <p className="text-2xl text-gray-300 animate-pulse">Click anywhere or press any key to continue</p>
+            ) : (
+              <p className="text-2xl text-yellow-300 font-bold">Please wait... {remainingTime}s</p>
+            )}
           </div>
         </div>
       )}
