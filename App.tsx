@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameState, Question, Block, Enemy, Vector2D } from './types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, TILE_SIZE, COLORS, GRAVITY, JUMP_STRENGTH, MOVE_SPEED } from './constants';
-import { fetchQuestions } from './services/geminiService';
+import { getRandomQuestions } from './services/databaseService';
 import { audioService } from './services/audioService';
 import GameUI from './components/GameUI';
 import { drawPlayer } from './renderers/PlayerRenderer';
@@ -14,6 +14,7 @@ const COYOTE_TIME = 150; // ms
 const ENEMY_SPEED = 2.0;
 const INITIAL_LIVES = 3;
 const INVULNERABILITY_TIME = 1000;
+const RESPAWN_DELAY = 1000; // ms - time player cannot control character after respawn
 
 
 const App: React.FC = () => {
@@ -22,6 +23,9 @@ const App: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [lives, setLives] = useState(INITIAL_LIVES);
+  const [showHint, setShowHint] = useState(false);
+  const [showFunFact, setShowFunFact] = useState(false);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | undefined>(undefined);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(undefined);
@@ -33,6 +37,8 @@ const App: React.FC = () => {
   const currentQuestionIndexRef = useRef(currentQuestionIndex);
   const feedbackRef = useRef(feedback);
   const livesRef = useRef(lives);
+  const showHintRef = useRef(showHint);
+  const showFunFactRef = useRef(showFunFact);
 
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -40,11 +46,13 @@ const App: React.FC = () => {
     currentQuestionIndexRef.current = currentQuestionIndex;
     feedbackRef.current = feedback;
     livesRef.current = lives;
-  }, [gameState, questions, currentQuestionIndex, feedback, lives]);
+    showHintRef.current = showHint;
+    showFunFactRef.current = showFunFact;
+  }, [gameState, questions, currentQuestionIndex, feedback, lives, showHint, showFunFact]);
 
   // Game entities
   const playerRef = useRef({
-    pos: { x: 200, y: 904 },
+    pos: { x: 120, y: 904 },
     vel: { x: 0, y: 0 },
     width: 64,
     height: 96,
@@ -52,7 +60,10 @@ const App: React.FC = () => {
     lastGroundedTime: 0,
     facing: 1 as 1 | -1,
     lastHitTime: 0,
-    prevPos: { x: 200, y: 904 }
+    prevPos: { x: 120, y: 904 },
+    respawnTime: 0,
+    isHit: false,
+    hitAnimationTimer: 0
   });
 
   const blocksRef = useRef<Block[]>([]);
@@ -89,7 +100,16 @@ const App: React.FC = () => {
       });
     });
 
-    // Spawn 1-2 Goombas per level
+    // Add pipe barrier between player and enemy zone
+    blocks.push({
+      type: 'PIPE',
+      pos: { x: 270, y: CANVAS_HEIGHT - TILE_SIZE - 128 },
+      vel: { x: 0, y: 0 },
+      width: 96,
+      height: 128
+    });
+
+    // Enemy - starts on the right, patrols within safe zone
     enemies.push({
       type: 'GOOMBA',
       pos: { x: CANVAS_WIDTH - 300, y: CANVAS_HEIGHT - TILE_SIZE - 64 },
@@ -103,8 +123,8 @@ const App: React.FC = () => {
 
     blocksRef.current = blocks;
     enemiesRef.current = enemies;
-    playerRef.current.pos = { x: 200, y: 904 };
-    playerRef.current.prevPos = { x: 200, y: 904 };
+    playerRef.current.pos = { x: 120, y: 904 };
+    playerRef.current.prevPos = { x: 120, y: 904 };
     playerRef.current.vel = { x: 0, y: 0 };
   }, []);
 
@@ -128,53 +148,38 @@ const App: React.FC = () => {
       height: 240
     });
     blocksRef.current = blocks;
-    playerRef.current.pos = { x: 200, y: 904 };
-    playerRef.current.prevPos = { x: 200, y: 904 };
+    playerRef.current.pos = { x: 120, y: 904 };
+    playerRef.current.prevPos = { x: 120, y: 904 };
     audioService.playSuccess();
   }, []);
 
-  const handleStart = async (topic: string) => {
+  const handleStart = async (topic: string, selectedDifficulty?: 'easy' | 'medium' | 'hard') => {
     setGameState(GameState.LOADING);
     setLives(INITIAL_LIVES);
-    const fetched = await fetchQuestions(topic);
-    setQuestions(fetched);
-    if (fetched.length > 0) {
+    setDifficulty(selectedDifficulty);
+
+    try {
+      // Fetch ALL questions from database with optional difficulty filter
+      const fetched = await getRandomQuestions(100, topic, selectedDifficulty); // Fetch up to 100 questions
+
+      if (fetched.length === 0) {
+        const difficultyMsg = selectedDifficulty ? ` (${selectedDifficulty} difficulty)` : '';
+        alert(`No questions found for topic: "${topic}"${difficultyMsg}. Please try a different topic or add questions to the database first.`);
+        setGameState(GameState.MENU);
+        return;
+      }
+
+      setQuestions(fetched);
       setCurrentQuestionIndex(0);
+      setShowHint(false);
+      setShowFunFact(false);
       initLevel(fetched[0]);
       setGameState(GameState.PLAYING);
+    } catch (error) {
+      console.error('Error loading questions from database:', error);
+      alert('Failed to load questions from database. Please check your connection.');
+      setGameState(GameState.MENU);
     }
-  };
-
-  const handleStartOffline = () => {
-    setGameState(GameState.LOADING);
-    setLives(INITIAL_LIVES);
-
-    // Offline development mode questions
-    const offlineQuestions: Question[] = [
-      {
-        id: 1,
-        text: "What is the capital of France?",
-        options: ["London", "Paris", "Berlin", "Madrid"],
-        correctAnswer: "Paris"
-      },
-      {
-        id: 2,
-        text: "What is 5 × 7?",
-        options: ["30", "35", "40", "45"],
-        correctAnswer: "35"
-      },
-      {
-        id: 3,
-        text: "Which planet is known as the Red Planet?",
-        options: ["Venus", "Mars", "Jupiter", "Saturn"],
-        correctAnswer: "Mars"
-      }
-    ];
-
-    setQuestions(offlineQuestions);
-    setCurrentQuestionIndex(0);
-    initLevel(offlineQuestions[0]);
-    setTimeout(() => setGameState(GameState.PLAYING), 500);
   };
 
   const handlePause = () => {
@@ -189,13 +194,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDismissFunFact = () => {
+    setFeedback(null);
+    setShowFunFact(false);
+    setShowHint(false);
+
+    if (currentQuestionIndex + 1 < questions.length) {
+      const nextIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(nextIndex);
+      initLevel(questions[nextIndex]);
+    } else {
+      setGameState(GameState.SUCCESS);
+      spawnCastleLevel();
+    }
+  };
+
+  const handleToggleHint = () => {
+    // Just toggle hint - the update loop will skip when hint is showing
+    setShowHint(!showHint);
+  };
+
   // Initialize input handling hook after handlers are defined
   const keysInput = useInput({ gameState, onPause: handlePause, onResume: handleResume });
 
   const update = useCallback(() => {
     const currentState = gameStateRef.current;
-    // Skip updates when paused
+    // Skip updates when paused, or when hint/fun fact is showing
     if (currentState !== GameState.PLAYING && currentState !== GameState.SUCCESS) return;
+    if (showHintRef.current || showFunFactRef.current) return; // Pause game when hint or fun fact is visible
 
     const player = playerRef.current;
     const now = performance.now();
@@ -208,45 +234,62 @@ const App: React.FC = () => {
     // Time scale relative to 60FPS (16.6ms)
     const timeScale = clampedDt / (1 / 60);
 
-    // Save previous position for tunneling checks
+    // Save previous position for anti-tunneling checks
     player.prevPos = { ...player.pos };
 
-    // Movement
-    if (keysInput.current['ArrowLeft'] || keysInput.current['a'] || keysInput.current['A']) {
-      player.vel.x = -MOVE_SPEED;
-      player.facing = -1;
-    } else if (keysInput.current['ArrowRight'] || keysInput.current['d'] || keysInput.current['D']) {
-      player.vel.x = MOVE_SPEED;
-      player.facing = 1;
+    // === INPUT HANDLING ===
+    // Block input during respawn delay
+    const isRespawning = now - player.respawnTime < RESPAWN_DELAY;
+
+    if (!isRespawning) {
+      if (keysInput.current['ArrowLeft'] || keysInput.current['a'] || keysInput.current['A']) {
+        player.vel.x = -MOVE_SPEED;
+        player.facing = -1;
+      } else if (keysInput.current['ArrowRight'] || keysInput.current['d'] || keysInput.current['D']) {
+        player.vel.x = MOVE_SPEED;
+        player.facing = 1;
+      } else {
+        player.vel.x *= 0.8;
+      }
+
+      // Jump Logic
+      const canJump = player.grounded || (now - player.lastGroundedTime < COYOTE_TIME);
+      const jumpPressed = keysInput.current['ArrowUp'] || keysInput.current['w'] || keysInput.current['W'] || keysInput.current[' '];
+
+      if (jumpPressed && canJump) {
+        player.vel.y = JUMP_STRENGTH;
+        player.grounded = false;
+        player.lastGroundedTime = 0;
+        audioService.playJump();
+      }
+
+      if (!jumpPressed && player.vel.y < 0) {
+        player.vel.y *= 0.5;
+      }
     } else {
+      // During respawn delay, gradually slow down any existing velocity
       player.vel.x *= 0.8;
     }
 
-    // Jump Logic
-    const canJump = player.grounded || (now - player.lastGroundedTime < COYOTE_TIME);
-    const jumpPressed = keysInput.current['ArrowUp'] || keysInput.current['w'] || keysInput.current['W'] || keysInput.current[' '];
-
-    if (jumpPressed && canJump) {
-      player.vel.y = JUMP_STRENGTH;
-      player.grounded = false;
-      player.lastGroundedTime = 0;
-      audioService.playJump();
-    }
-
-    if (!jumpPressed && player.vel.y < 0) {
-      player.vel.y *= 0.5;
-    }
-
+    // Apply gravity
     player.vel.y += GRAVITY;
+
+    // === PER-AXIS COLLISION RESOLUTION ===
+
+    // 1. MOVE AND RESOLVE X-AXIS
     player.pos.x += player.vel.x;
-    player.pos.y += player.vel.y;
 
-    if (player.pos.x < 0) player.pos.x = 0;
-    if (player.pos.x + player.width > CANVAS_WIDTH) player.pos.x = CANVAS_WIDTH - player.width;
+    // Clamp to canvas boundaries
+    if (player.pos.x < 0) {
+      player.pos.x = 0;
+      player.vel.x = 0;
+    }
+    if (player.pos.x + player.width > CANVAS_WIDTH) {
+      player.pos.x = CANVAS_WIDTH - player.width;
+      player.vel.x = 0;
+    }
 
-    player.grounded = false;
-
-    // Block collisions
+    // Check X collisions with blocks
     blocksRef.current.forEach((block) => {
       if (
         player.pos.x < block.pos.x + block.width &&
@@ -254,69 +297,82 @@ const App: React.FC = () => {
         player.pos.y < block.pos.y + block.height &&
         player.pos.y + player.height > block.pos.y
       ) {
-        const overlapX = Math.min(player.pos.x + player.width - block.pos.x, block.pos.x + block.width - player.pos.x);
-        const overlapY = Math.min(player.pos.y + player.height - block.pos.y, block.pos.y + block.height - player.pos.y);
+        // X-axis collision detected
+        if (player.vel.x > 0) {
+          // Moving right, hit left side of block
+          player.pos.x = block.pos.x - player.width;
+          player.vel.x = 0;
+        } else if (player.vel.x < 0) {
+          // Moving left, hit right side of block
+          player.pos.x = block.pos.x + block.width;
+          player.vel.x = 0;
+        }
+      }
+    });
 
-        if (overlapX > overlapY) {
-          if (player.vel.y > 0) {
-            player.pos.y = block.pos.y - player.height;
-            player.vel.y = 0;
-            player.grounded = true;
-          } else if (player.vel.y < 0) {
-            player.pos.y = block.pos.y + block.height;
-            player.vel.y = 0;
-            audioService.playHit();
+    // 2. MOVE AND RESOLVE Y-AXIS
+    player.pos.y += player.vel.y;
+    player.grounded = false;
 
-            if (block.type === 'QUESTION' && !block.isHit && gameStateRef.current === GameState.PLAYING && !feedbackRef.current) {
-              block.isHit = true;
-              const currentQ = questionsRef.current[currentQuestionIndexRef.current];
-              if (block.label === currentQ.correctAnswer) {
-                setFeedback('CORRECT!');
-                audioService.playCorrect();
-                setTimeout(() => {
-                  setFeedback(null);
-                  if (currentQuestionIndexRef.current + 1 < questionsRef.current.length) {
-                    const nextIndex = currentQuestionIndexRef.current + 1;
-                    setCurrentQuestionIndex(nextIndex);
-                    initLevel(questionsRef.current[nextIndex]);
-                  } else {
-                    setGameState(GameState.SUCCESS);
-                    spawnCastleLevel();
-                  }
-                }, 1000);
-              } else {
-                setFeedback('TRY AGAIN!');
-                audioService.playIncorrect();
-                setTimeout(() => {
-                  setFeedback(null);
-                  block.isHit = false;
-                }, 800);
-              }
+    // Check Y collisions with blocks
+    blocksRef.current.forEach((block) => {
+      if (
+        player.pos.x < block.pos.x + block.width &&
+        player.pos.x + player.width > block.pos.x &&
+        player.pos.y < block.pos.y + block.height &&
+        player.pos.y + player.height > block.pos.y
+      ) {
+        // Y-axis collision detected
+        if (player.vel.y > 0) {
+          // Falling down, hit top of block (FLOOR COLLISION)
+          player.pos.y = block.pos.y - player.height; // Snap UP to floor top
+          player.vel.y = 0;
+          player.grounded = true;
+        } else if (player.vel.y < 0) {
+          // Moving up, hit bottom of block (CEILING COLLISION)
+          player.pos.y = block.pos.y + block.height; // Snap DOWN to ceiling bottom
+          player.vel.y = 0;
+          audioService.playHit();
+
+          // Question block logic
+          if (block.type === 'QUESTION' && !block.isHit && gameStateRef.current === GameState.PLAYING && !feedbackRef.current) {
+            block.isHit = true;
+            const currentQ = questionsRef.current[currentQuestionIndexRef.current];
+            if (block.label === currentQ.correctAnswer) {
+              setFeedback('CORRECT!');
+              setShowFunFact(true);
+              audioService.playCorrect();
+            } else {
+              setFeedback('TRY AGAIN!');
+              audioService.playIncorrect();
+              setTimeout(() => {
+                setFeedback(null);
+                block.isHit = false;
+              }, 800);
             }
           }
-        } else {
-          if (player.vel.x > 0) {
-            player.pos.x = block.pos.x - player.width;
-          } else {
-            player.pos.x = block.pos.x + block.width;
-          }
         }
-      } else {
-        // Anti-tunneling: Check if we passed through a floor
-        // Condition: previous Bottom was <= block Top, AND current Bottom >= block Top
-        // AND x overlap exists
+      }
+    });
+
+    // 3. ANTI-TUNNELING CHECK (for extremely fast falls)
+    // Only check if we didn't already collide above
+    if (!player.grounded) {
+      blocksRef.current.forEach((block) => {
+        // Check if we passed through a floor this frame
         if (
           player.prevPos.y + player.height <= block.pos.y &&
           player.pos.y + player.height >= block.pos.y &&
           player.pos.x < block.pos.x + block.width &&
           player.pos.x + player.width > block.pos.x
         ) {
+          // Tunneled through floor - snap up
           player.pos.y = block.pos.y - player.height;
           player.vel.y = 0;
           player.grounded = true;
         }
-      }
-    });
+      });
+    }
 
     // Enemy logic
     enemiesRef.current.forEach(enemy => {
@@ -325,9 +381,17 @@ const App: React.FC = () => {
         return;
       }
 
-      // Patrol
+      // Patrol within safe boundaries (don't overlap with pipe or go to player spawn)
+      const PIPE_X = 270; // Pipe starts at x=270
+      const PIPE_WIDTH = 96; // Pipe width is 96
+      const PIPE_END = PIPE_X + PIPE_WIDTH; // Pipe x position + pipe width = 366
+      const MIN_ENEMY_X = PIPE_END + 20; // Add 20px buffer = 386
+      const MAX_ENEMY_X = CANVAS_WIDTH;
+
       enemy.pos.x += enemy.vel.x * timeScale;
-      if (enemy.pos.x < 0 || enemy.pos.x + enemy.width > CANVAS_WIDTH) {
+
+      // Bounce at boundaries
+      if (enemy.pos.x < MIN_ENEMY_X || enemy.pos.x + enemy.width > MAX_ENEMY_X) {
         enemy.vel.x *= -1;
         enemy.facing = enemy.vel.x > 0 ? 1 : -1;
       }
@@ -349,10 +413,15 @@ const App: React.FC = () => {
           if (now - player.lastHitTime > INVULNERABILITY_TIME) {
             player.lastHitTime = now;
 
+            // Trigger hit animation
+            player.isHit = true;
+            player.hitAnimationTimer = 0;
+
             // Apply penalty/reset immediately
-            player.pos = { x: 200, y: 904 };
-            player.prevPos = { x: 200, y: 904 };
+            player.pos = { x: 120, y: 904 };
+            player.prevPos = { x: 120, y: 904 };
             player.vel = { x: 0, y: 0 };
+            player.respawnTime = now;
             audioService.playIncorrect();
 
             // Handle life loss
@@ -378,8 +447,14 @@ const App: React.FC = () => {
     if (player.pos.y > CANVAS_HEIGHT + 64 && now - player.lastHitTime > INVULNERABILITY_TIME) {
       // Pit logic
       player.lastHitTime = now;
-      player.pos = { x: 200, y: 904 };
+
+      // Trigger hit animation
+      player.isHit = true;
+      player.hitAnimationTimer = 0;
+
+      player.pos = { x: 120, y: 904 };
       player.vel = { x: 0, y: 0 };
+      player.respawnTime = now;
       audioService.playIncorrect();
 
       setLives(prev => {
@@ -389,6 +464,16 @@ const App: React.FC = () => {
         }
         return nextLives;
       });
+    }
+
+    // Update hit animation timer
+    if (player.isHit) {
+      player.hitAnimationTimer += timeScale;
+      // End hit animation after invulnerability period
+      if (now - player.lastHitTime >= INVULNERABILITY_TIME) {
+        player.isHit = false;
+        player.hitAnimationTimer = 0;
+      }
     }
   }, [initLevel, spawnCastleLevel]); // Dependencies reduced significantly
 
@@ -400,54 +485,125 @@ const App: React.FC = () => {
     drawEnvironment(ctx, CANVAS_HEIGHT, TILE_SIZE);
 
     blocksRef.current.forEach(block => {
-      if (block.type === 'FLOOR') {
-        ctx.fillStyle = COLORS.DIRT;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-        ctx.fillStyle = COLORS.GRASS;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, 8);
-      } else if (block.type === 'QUESTION') {
-        ctx.fillStyle = block.isHit ? COLORS.HIT_BLOCK : COLORS.QUESTION_BLOCK;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
+      switch (block.type) {
+        case 'FLOOR':
+          ctx.fillStyle = COLORS.DIRT;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          ctx.fillStyle = COLORS.GRASS;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, 8);
+          break;
 
-        if (!block.isHit) {
-          ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-          ctx.strokeRect(block.pos.x + 4, block.pos.y + 4, block.width - 8, block.height - 8);
-          ctx.fillStyle = '#000';
-          ctx.font = 'bold 48px Arial';
+        case 'PIPE':
+          // Green pipe body
+          ctx.fillStyle = '#2ECC40';
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          // Pipe rim (top)
+          ctx.fillStyle = '#01FF70';
+          ctx.fillRect(block.pos.x - 8, block.pos.y, block.width + 16, 16);
+          // Pipe outline
+          ctx.strokeStyle = '#1a8c26';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
+          // Vertical line in middle
+          ctx.beginPath();
+          ctx.moveTo(block.pos.x + block.width / 2, block.pos.y + 16);
+          ctx.lineTo(block.pos.x + block.width / 2, block.pos.y + block.height);
+          ctx.stroke();
+          break;
+
+        case 'QUESTION':
+          // Mario-style question block with orange color and rounded appearance
+          const blockColor = block.isHit ? COLORS.HIT_BLOCK : '#E89C3C'; // Orange color
+          const darkBorder = block.isHit ? '#404040' : '#C67A28'; // Darker orange border
+
+          // Draw main block with rounded corners effect
+          ctx.fillStyle = blockColor;
+          ctx.fillRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
+
+          // Draw darker border/outline
+          ctx.strokeStyle = darkBorder;
+          ctx.lineWidth = 4;
+          ctx.strokeRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
+
+          if (!block.isHit) {
+            // Add 3D beveled effect - top and left highlights
+            ctx.strokeStyle = '#FFD89C';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(block.pos.x + 6, block.pos.y + block.height - 6);
+            ctx.lineTo(block.pos.x + 6, block.pos.y + 6);
+            ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + 6);
+            ctx.stroke();
+
+            // Bottom and right shadows
+            ctx.strokeStyle = '#B87A28';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(block.pos.x + block.width - 6, block.pos.y + 6);
+            ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + block.height - 6);
+            ctx.lineTo(block.pos.x + 6, block.pos.y + block.height - 6);
+            ctx.stroke();
+
+            // Draw corner dots (classic Mario question block style)
+            ctx.fillStyle = '#B87A28';
+            const dotSize = 4;
+            const dotOffset = 12;
+            // Top-left dot
+            ctx.fillRect(block.pos.x + dotOffset, block.pos.y + dotOffset, dotSize, dotSize);
+            // Top-right dot
+            ctx.fillRect(block.pos.x + block.width - dotOffset - dotSize, block.pos.y + dotOffset, dotSize, dotSize);
+            // Bottom-left dot
+            ctx.fillRect(block.pos.x + dotOffset, block.pos.y + block.height - dotOffset - dotSize, dotSize, dotSize);
+            // Bottom-right dot
+            ctx.fillRect(block.pos.x + block.width - dotOffset - dotSize, block.pos.y + block.height - dotOffset - dotSize, dotSize, dotSize);
+
+            // Draw the letter (A, B, C, D)
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Find the block index to determine which letter to display
+            const blockIndex = blocksRef.current.filter(b => b.type === 'QUESTION').indexOf(block);
+            const letter = String.fromCharCode(65 + blockIndex); // 65 is 'A' in ASCII
+            ctx.fillText(letter, block.pos.x + block.width / 2, block.pos.y + block.height / 2 + 2);
+          }
+
+          ctx.fillStyle = '#fff';
+          ctx.font = '18px "Press Start 2P"';
           ctx.textAlign = 'center';
-          ctx.fillText('?', block.pos.x + block.width / 2, block.pos.y + 38);
-        }
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.letterSpacing = '2px';  // Add spacing between letters
+          const words = block.label?.split(' ') || [];
+          const lines: string[] = [];
+          let currentLine = "";
+          words.forEach(word => {
+            if ((currentLine + word).length < 15) currentLine += (currentLine ? " " : "") + word;
+            else { lines.push(currentLine); currentLine = word; }
+          });
+          lines.push(currentLine);
+          lines.reverse().forEach((line, i) => {
+            // Draw black outline first
+            ctx.strokeText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
+            // Then draw white fill on top
+            ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
+          });
+          break;
 
-        ctx.fillStyle = '#fff';
-        ctx.font = '18px "Press Start 2P"';
-        ctx.textAlign = 'center';
-        const words = block.label?.split(' ') || [];
-        const lines: string[] = [];
-        let currentLine = "";
-        words.forEach(word => {
-          if ((currentLine + word).length < 15) currentLine += (currentLine ? " " : "") + word;
-          else { lines.push(currentLine); currentLine = word; }
-        });
-        lines.push(currentLine);
-        lines.reverse().forEach((line, i) => {
-          ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - (i * 24));
-        });
-      } else if (block.type === 'CASTLE') {
-        ctx.fillStyle = COLORS.CASTLE;
-        ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(block.pos.x + block.width / 2 - 15, block.pos.y + block.height - 40, 30, 40);
-        for (let i = 0; i < 4; i++) ctx.fillRect(block.pos.x + i * 35, block.pos.y - 20, 15, 20);
+        case 'CASTLE':
+          ctx.fillStyle = COLORS.CASTLE;
+          ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
+          ctx.fillStyle = '#000';
+          ctx.fillRect(block.pos.x + block.width / 2 - 15, block.pos.y + block.height - 40, 30, 40);
+          for (let i = 0; i < 4; i++) ctx.fillRect(block.pos.x + i * 35, block.pos.y - 20, 15, 20);
+          break;
       }
     });
 
     enemiesRef.current.forEach(enemy => drawEnemy(ctx, enemy));
 
     if (gameStateRef.current !== GameState.GAMEOVER) {
-      drawPlayer(ctx, playerRef.current);
+      drawPlayer(ctx, playerRef.current, performance.now() - playerRef.current.lastHitTime);
     }
   }, []); // Constant draw function
 
@@ -477,20 +633,25 @@ const App: React.FC = () => {
           width={CANVAS_WIDTH}
           height={CANVAS_HEIGHT}
           className="w-full h-full"
-          style={{ imageRendering: 'pixelated' }}
+          style={{ imageRendering: 'auto' }}
         />
         <GameUI
           gameState={gameState}
           currentQuestion={questions[currentQuestionIndex]}
           currentQuestionIndex={currentQuestionIndex}
           onStart={handleStart}
-          onStartOffline={handleStartOffline}
           onPause={handlePause}
           onResume={handleResume}
           feedback={feedback}
           score={currentQuestionIndex * 100}
           totalQuestions={questions.length}
           lives={lives}
+          showHint={showHint}
+          onToggleHint={handleToggleHint}
+          showFunFact={showFunFact}
+          onDismissFunFact={handleDismissFunFact}
+          difficulty={difficulty}
+          onDifficultyChange={setDifficulty}
         />
       </div>
     </div>

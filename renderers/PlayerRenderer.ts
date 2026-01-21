@@ -25,12 +25,26 @@ interface PlayerState {
     facing: 1 | -1;
 }
 
-export function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState): void {
+const INVULNERABILITY_TIME = 1000; // ms - should match App.tsx constant
+
+export function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState, timeSinceHit: number = Infinity): void {
     const pixelSize = 6;
     const startX = player.pos.x + (player.width - (12 * pixelSize)) / 2;
     const startY = player.pos.y;
 
     ctx.save();
+
+    // Apply flashing effect during invulnerability period
+    if (timeSinceHit < INVULNERABILITY_TIME) {
+        // Flash every 100ms (10 flashes per second)
+        const flashInterval = 100;
+        const flashPhase = Math.floor(timeSinceHit / flashInterval) % 2;
+
+        if (flashPhase === 1) {
+            ctx.globalAlpha = 0.3; // Make player semi-transparent during flash
+        }
+    }
+
     MARIO_PIXELS.forEach((row, y) => {
         for (let x = 0; x < row.length; x++) {
             const char = row[x];
