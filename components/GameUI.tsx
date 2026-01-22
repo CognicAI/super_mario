@@ -1,6 +1,8 @@
 
 import React from 'react';
-import { GameState, Question } from '../types';
+import { GameState, Question, WheelSegment } from '../types';
+import SpinningWheel from './SpinningWheel';
+import SubtopicReveal from './SubtopicReveal';
 
 interface GameUIProps {
   gameState: GameState;
@@ -19,6 +21,13 @@ interface GameUIProps {
   onDismissFunFact: () => void;
   difficulty?: 'easy' | 'medium' | 'hard';
   onDifficultyChange: (difficulty: 'easy' | 'medium' | 'hard' | undefined) => void;
+  wheelSegments?: WheelSegment[];
+  wheelKey?: number;
+  onWheelComplete?: (subtopic: string) => void;
+  selectedSubtopic?: string;
+  showSubtopicReveal?: boolean;
+  onSubtopicRevealContinue?: () => void;
+  onSpinAgain?: () => void;
 }
 
 const GameUI: React.FC<GameUIProps> = ({
@@ -37,7 +46,14 @@ const GameUI: React.FC<GameUIProps> = ({
   showFunFact,
   onDismissFunFact,
   difficulty,
-  onDifficultyChange
+  onDifficultyChange,
+  wheelSegments = [],
+  wheelKey = 0,
+  onWheelComplete,
+  selectedSubtopic,
+  showSubtopicReveal,
+  onSubtopicRevealContinue,
+  onSpinAgain
 }) => {
   const [topic, setTopic] = React.useState('Source to Pay');
   const [loadingDots, setLoadingDots] = React.useState(0);
@@ -98,7 +114,7 @@ const GameUI: React.FC<GameUIProps> = ({
   if (gameState === GameState.MENU) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-12 z-50">
-        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Super Mario<br />Quiz Quest</h1>
+        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Paymaster <br></br>Finance Quest</h1>
         <div className="w-full max-w-3xl">
           <label className="block text-xl mb-2" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>SELECT TOPIC:</label>
           <div className="flex gap-4 justify-center mb-4">
@@ -123,7 +139,9 @@ const GameUI: React.FC<GameUIProps> = ({
           </div>
           <p className="text-sm text-gray-400 mb-4">Questions are loaded from database for: <span className="text-yellow-400">{topic}</span></p>
 
-          {/* Difficulty Selector */}
+          {/* Difficulty Selector - HIDDEN: Hardcoded to fetch all questions */}
+          {/* Uncomment below to re-enable difficulty selection */}
+          {/*
           <div className="mb-4">
             <label className="block text-xl mb-2" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>SELECT DIFFICULTY:</label>
             <div className="flex gap-4 justify-center">
@@ -165,9 +183,10 @@ const GameUI: React.FC<GameUIProps> = ({
               </button>
             </div>
           </div>
+          */}
 
           <button
-            onClick={() => onStart(topic, difficulty)}
+            onClick={() => onStart(topic, undefined)} // Hardcoded to undefined = fetch all questions
             className="w-full bg-red-600 hover:bg-red-700 text-white p-6 text-3xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all"
           >
             START GAME
@@ -177,6 +196,32 @@ const GameUI: React.FC<GameUIProps> = ({
           <p className="text-lg text-gray-400 mb-6 animate-pulse">JUMP INTO THE RIGHT BLOCK TO ANSWER</p>
           <p className="text-base text-gray-500">ARROW KEYS TO MOVE & JUMP</p>
         </div>
+      </div>
+    );
+  }
+
+  // Wheel Spinning Screen
+  if (gameState === GameState.WHEEL_SPINNING) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-purple-900 to-blue-900 text-white z-50">
+        <h1 className="text-6xl mb-8 text-yellow-400 uppercase" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>
+          Spin the Wheel!
+        </h1>
+        <p className="text-2xl mb-8 text-white/80">Let's discover your quiz topic!</p>
+        {wheelSegments.length > 0 && onWheelComplete && (
+          <SpinningWheel
+            key={wheelKey}
+            segments={wheelSegments}
+            onSpinComplete={onWheelComplete}
+          />
+        )}
+        {showSubtopicReveal && selectedSubtopic && onSubtopicRevealContinue && (
+          <SubtopicReveal
+            subtopic={selectedSubtopic}
+            onContinue={onSubtopicRevealContinue}
+            onSpinAgain={onSpinAgain}
+          />
+        )}
       </div>
     );
   }
@@ -226,12 +271,11 @@ const GameUI: React.FC<GameUIProps> = ({
       <div className="flex justify-between items-start text-white text-2xl">
         <div className="flex flex-col gap-4">
           <div>
-            <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>MARIO</div>
+            <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>ASSETS</div>
             <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>{score.toString().padStart(6, '0')}</div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-red-500 text-3xl">❤</span>
-            <span className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>x{lives}</span>
+            <span className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>ATTEMPTS: {lives}</span>
           </div>
         </div>
         <div className="text-center max-w-3xl">
@@ -251,8 +295,8 @@ const GameUI: React.FC<GameUIProps> = ({
           )}
         </div>
         <div>
-          <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>WORLD</div>
-          <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>1-1</div>
+          <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>LEVEL</div>
+          <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>1</div>
         </div>
       </div>
 
@@ -321,8 +365,8 @@ const GameUI: React.FC<GameUIProps> = ({
       {/* Success Screen */}
       {gameState === GameState.SUCCESS && (
         <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center pointer-events-auto z-[100]">
-          <h2 className="text-7xl text-yellow-400 mb-8 uppercase" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>COURSE CLEAR!</h2>
-          <p className="text-white mb-12 text-2xl">YOU REACHED THE CASTLE!</p>
+          <h2 className="text-7xl text-yellow-400 mb-8 uppercase" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>QUEST COMPLETE!</h2>
+          <p className="text-white mb-12 text-2xl">CHALLENGE CONQUERED!</p>
           <button
             onClick={() => window.location.reload()}
             className="bg-green-600 p-6 text-white text-3xl border-b-8 border-green-900 active:border-b-0 active:translate-y-2 transition-all uppercase"

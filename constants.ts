@@ -12,7 +12,7 @@ export const COLORS = {
   GRASS: '#32CD32',
   QUESTION_BLOCK: '#FFD700',
   HIT_BLOCK: '#808080',
-  MARIO: '#FF0000',
+  PLAYER: '#4A90E2',
   CASTLE: '#A9A9A9',
   TEXT: '#FFFFFF',
   BRICK: '#C84C0C',

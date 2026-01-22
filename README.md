@@ -1,11 +1,11 @@
-# Super Mario Quiz Quest 🎮
+# Finance Quest 🎯
 
-An interactive quiz game inspired by Super Mario, built with React, TypeScript, and Vite. Answer questions by jumping into the correct blocks!
+An interactive finance quiz game built with React, TypeScript, and Vite. Answer questions by jumping into the correct blocks in this fun platformer-style learning experience!
 
 ## Features
 
 - 🎯 AI-generated questions using Google Gemini API
-- 🕹️ Classic Mario-style platformer mechanics
+- 🕹️ Classic platformer mechanics
 - 🎨 Pixel-art graphics and retro aesthetics
 - 🔊 Sound effects for jumps, hits, and answers
 - 💪 Lives system with enemy encounters

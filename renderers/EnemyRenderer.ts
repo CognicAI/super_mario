@@ -1,13 +1,13 @@
 
-export const GOOMBA_PIXELS = [
-    "____BBBB____",
-    "___BBBBBB___",
-    "__BBBBBBBB__",
-    "_BBWWBBWWBB_",
-    "_BBWWBWWBWBB_",
-    "_BBBBBBBBBB_",
-    "__BBBBBBBB__",
-    "___MM__MM___"
+export const OBSTACLE_PIXELS = [
+    "_____RR_____",
+    "____RRRR____",
+    "___RRRRRR___",
+    "__RRWWWWRR__",
+    "_RRWW!!WWRR_",
+    "_RRW!!!!WRR_",
+    "RRWW!!!!WWRR",
+    "RRRRRRRRRRRR"
 ];
 
 interface EnemyState {
@@ -20,15 +20,15 @@ export function drawEnemy(ctx: CanvasRenderingContext2D, enemy: EnemyState): voi
     const startX = enemy.pos.x;
     const startY = enemy.isDead ? enemy.pos.y + 32 : enemy.pos.y;
 
-    GOOMBA_PIXELS.forEach((row, y) => {
+    OBSTACLE_PIXELS.forEach((row, y) => {
         for (let x = 0; x < row.length; x++) {
             const char = row[x];
-            if (char === '_') continue;
+            if (char === '_' || char === ' ') continue;
             let color = '#000';
             switch (char) {
-                case 'B': color = '#8B4513'; break;
-                case 'W': color = '#FFFFFF'; break;
-                case 'M': color = '#000000'; break;
+                case 'R': color = '#E74C3C'; break; // Red warning triangle
+                case 'W': color = '#FFD93D'; break; // Yellow warning stripes
+                case '!': color = '#000000'; break; // Black exclamation marks
             }
             ctx.fillStyle = color;
             ctx.fillRect(startX + x * pixelSize, startY + y * pixelSize, pixelSize, pixelSize);

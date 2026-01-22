@@ -43,6 +43,7 @@ function rowToQuestion(row: QuestionRow): Question {
         hint: row.hint || undefined,
         funFact: row.fun_fact || undefined,
         topic: row.topic,
+        subtopic: row.subtopic || undefined,
         difficulty: row.difficulty || undefined,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at)
@@ -71,6 +72,7 @@ function questionToRow(question: Question, topic: string = 'general'): Partial<Q
         hint: question.hint || null,
         fun_fact: question.funFact || null,
         topic: question.topic || topic,
+        subtopic: question.subtopic || null,
         difficulty: question.difficulty || null
     };
 }
@@ -84,7 +86,7 @@ export async function saveQuestions(questions: Question[], topic: string = 'gene
     const rows = questions.map(q => questionToRow(q, topic));
 
     const { error } = await client
-        .from('questions')
+        .from('questions_1')
         .insert(rows);
 
     if (error) {
@@ -100,7 +102,7 @@ export async function getQuestionsByTopic(topic: string, limit?: number): Promis
     const client = getSupabaseClient();
 
     let query = client
-        .from('questions')
+        .from('questions_1')
         .select('*')
         .eq('topic', topic)
         .order('created_at', { ascending: false });
@@ -122,7 +124,7 @@ export async function getQuestionsByTopic(topic: string, limit?: number): Promis
 /**
  * Get random questions
  */
-export async function getRandomQuestions(count: number, topic?: string, difficulty?: 'easy' | 'medium' | 'hard'): Promise<Question[]> {
+export async function getRandomQuestions(count: number, topic?: string, difficulty?: 'easy' | 'medium' | 'hard', subtopic?: string): Promise<Question[]> {
     const client = getSupabaseClient();
 
     // Note: Supabase doesn't have a built-in RANDOM() function in the query builder
@@ -130,7 +132,7 @@ export async function getRandomQuestions(count: number, topic?: string, difficul
     const fetchCount = Math.max(count * 3, 20); // Fetch 3x more to randomize from
 
     let query = client
-        .from('questions')
+        .from('questions_1')
         .select('*')
         .limit(fetchCount);
 
@@ -140,6 +142,10 @@ export async function getRandomQuestions(count: number, topic?: string, difficul
 
     if (difficulty) {
         query = query.eq('difficulty', difficulty);
+    }
+
+    if (subtopic) {
+        query = query.eq('subtopic', subtopic);
     }
 
     const { data, error } = await query;
@@ -182,7 +188,7 @@ export async function updateQuestion(id: number, updates: Partial<Question>): Pr
     if (updates.difficulty !== undefined) row.difficulty = updates.difficulty;
 
     const { error } = await client
-        .from('questions')
+        .from('questions_1')
         .update(row)
         .eq('id', id);
 
@@ -199,7 +205,7 @@ export async function deleteQuestion(id: number): Promise<void> {
     const client = getSupabaseClient();
 
     const { error } = await client
-        .from('questions')
+        .from('questions_1')
         .delete()
         .eq('id', id);
 
@@ -216,7 +222,7 @@ export async function getQuestionById(id: number): Promise<Question | null> {
     const client = getSupabaseClient();
 
     const { data, error } = await client
-        .from('questions')
+        .from('questions_1')
         .select('*')
         .eq('id', id)
         .single();
@@ -240,7 +246,7 @@ export async function getAllTopics(): Promise<string[]> {
     const client = getSupabaseClient();
 
     const { data, error } = await client
-        .from('questions')
+        .from('questions_1')
         .select('topic')
         .order('topic');
 
@@ -261,7 +267,7 @@ export async function getQuestionCountByTopic(topic: string): Promise<number> {
     const client = getSupabaseClient();
 
     const { count, error } = await client
-        .from('questions')
+        .from('questions_1')
         .select('*', { count: 'exact', head: true })
         .eq('topic', topic);
 

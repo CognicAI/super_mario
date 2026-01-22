@@ -1,23 +1,4 @@
 
-export const MARIO_PIXELS = [
-    "____RRRRR___",
-    "___RRRRRRRRR",
-    "___MMMSSSMS_",
-    "__MSMS SSSMS",
-    "__MSMM SSSMS",
-    "__MMSSSSMMMM",
-    "____SSSSSSS_",
-    "___RRBRRR___",
-    "__RRRBRRBRR_",
-    "_RRRRBBBBRRR",
-    "SSRBWBBWBRSS",
-    "SS SBBBBBBSS",
-    "S SBBBBBBBB S",
-    "___BBB__BBB_",
-    "__MMM____MMM",
-    "_MMMM____MMMM"
-];
-
 interface PlayerState {
     pos: { x: number; y: number };
     width: number;
@@ -27,40 +8,57 @@ interface PlayerState {
 
 const INVULNERABILITY_TIME = 1000; // ms - should match App.tsx constant
 
-export function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState, timeSinceHit: number = Infinity): void {
-    const pixelSize = 6;
-    const startX = player.pos.x + (player.width - (12 * pixelSize)) / 2;
-    const startY = player.pos.y;
+// Load player image
+let playerImage: HTMLImageElement | null = null;
+let imageLoaded = false;
 
+// Initialize image loading
+if (typeof window !== 'undefined') {
+    playerImage = new Image();
+    playerImage.src = '/assets/player.png';
+    playerImage.onload = () => {
+        imageLoaded = true;
+    };
+}
+
+export function drawPlayer(ctx: CanvasRenderingContext2D, player: PlayerState, timeSinceHit: number = Infinity): void {
     ctx.save();
 
     // Apply flashing effect during invulnerability period
     if (timeSinceHit < INVULNERABILITY_TIME) {
-        // Flash every 100ms (10 flashes per second)
         const flashInterval = 100;
         const flashPhase = Math.floor(timeSinceHit / flashInterval) % 2;
 
         if (flashPhase === 1) {
-            ctx.globalAlpha = 0.3; // Make player semi-transparent during flash
+            ctx.globalAlpha = 0.3;
         }
     }
 
-    MARIO_PIXELS.forEach((row, y) => {
-        for (let x = 0; x < row.length; x++) {
-            const char = row[x];
-            if (char === '_') continue;
-            let color = '#000';
-            switch (char) {
-                case 'R': color = '#FF0000'; break;
-                case 'B': color = '#0000FF'; break;
-                case 'S': color = '#FFCC99'; break;
-                case 'M': color = '#4B2E0B'; break;
-                case 'W': color = '#FFFFFF'; break;
-            }
-            ctx.fillStyle = color;
-            const drawX = player.facing === 1 ? startX + x * pixelSize : startX + (11 - x) * pixelSize;
-            ctx.fillRect(drawX, startY + y * pixelSize, pixelSize, pixelSize);
+    if (imageLoaded && playerImage) {
+        // Calculate scaling to fit player dimensions
+        const scale = player.height / playerImage.height;
+        const scaledWidth = playerImage.width * scale;
+        const scaledHeight = playerImage.height * scale;
+
+        // Center the image horizontally
+        const drawX = player.pos.x + (player.width - scaledWidth) / 2;
+        const drawY = player.pos.y;
+
+        // Flip image if facing left
+        if (player.facing === -1) {
+            ctx.save();
+            ctx.translate(drawX + scaledWidth / 2, drawY + scaledHeight / 2);
+            ctx.scale(-1, 1);
+            ctx.drawImage(playerImage, -scaledWidth / 2, -scaledHeight / 2, scaledWidth, scaledHeight);
+            ctx.restore();
+        } else {
+            ctx.drawImage(playerImage, drawX, drawY, scaledWidth, scaledHeight);
         }
-    });
+    } else {
+        // Fallback: draw a simple rectangle if image hasn't loaded
+        ctx.fillStyle = '#1C1C1C';
+        ctx.fillRect(player.pos.x, player.pos.y, player.width, player.height);
+    }
+
     ctx.restore();
 }

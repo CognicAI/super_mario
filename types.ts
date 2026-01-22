@@ -6,7 +6,8 @@ export interface Question {
   correctAnswer: string;  // 'A', 'B', 'C', or 'D'
   hint?: string;  // Optional hint for the question
   funFact?: string;  // Fun fact about the question/answer
-  topic?: string;  // Question topic/category (e.g., 'super-mario', 'geography')
+  topic?: string;  // Question topic/category (e.g., 'finance', 'geography')
+  subtopic?: string;  // Question subtopic (e.g., 'Creating PO', 'Sourcing and selecting Suppliers')
   difficulty?: 'easy' | 'medium' | 'hard';  // Difficulty level
   createdAt?: Date;  // Creation timestamp
   updatedAt?: Date;  // Last update timestamp
@@ -24,6 +25,7 @@ export interface QuestionRow {
   hint: string | null;
   fun_fact: string | null;
   topic: string;
+  subtopic: string | null;
   difficulty: 'easy' | 'medium' | 'hard' | null;
   created_at: string;
   updated_at: string;
@@ -36,6 +38,7 @@ export interface Vector2D {
 
 export enum GameState {
   MENU = 'MENU',
+  WHEEL_SPINNING = 'WHEEL_SPINNING',
   LOADING = 'LOADING',
   PLAYING = 'PLAYING',
   PAUSED = 'PAUSED',
@@ -61,4 +64,18 @@ export interface Enemy extends Entity {
   isDead: boolean;
   deadTimer: number;
   facing: 1 | -1;
+}
+
+export interface WheelSegment {
+  id: number;
+  label: string;  // "Choice 1", "Choice 2", etc.
+  subtopic: string;  // Actual subtopic name
+  color: string;  // Hex color for the segment
+  startAngle: number;
+  endAngle: number;
+}
+
+export interface SubtopicConfig {
+  name: string;
+  color: string;
 }

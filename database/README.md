@@ -1,6 +1,6 @@
 # Database Setup Guide
 
-This directory contains the database schema and migrations for the Super Mario Quiz Quest application.
+This directory contains the database schema and migrations for the Finance Quest application.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This directory contains the database schema and migrations for the Super Mario Q
 1. Go to [supabase.com](https://supabase.com) and sign up/login
 2. Click "New Project"
 3. Fill in project details:
-   - Name: `super-mario-quiz-quest` (or your preferred name)
+   - Name: `finance-quiz-quest` (or your preferred name)
    - Database Password: (choose a strong password)
    - Region: (choose closest to your users)
 4. Wait for the project to be created (~2 minutes)

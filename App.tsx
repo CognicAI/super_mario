@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GameState, Question, Block, Enemy, Vector2D } from './types';
+import { GameState, Question, Block, Enemy, Vector2D, WheelSegment } from './types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, TILE_SIZE, COLORS, GRAVITY, JUMP_STRENGTH, MOVE_SPEED } from './constants';
 import { getRandomQuestions } from './services/databaseService';
 import { audioService } from './services/audioService';
@@ -9,6 +9,7 @@ import { drawPlayer } from './renderers/PlayerRenderer';
 import { drawEnemy } from './renderers/EnemyRenderer';
 import { drawEnvironment } from './renderers/EnvironmentRenderer';
 import { useInput } from './hooks/useInput';
+import { getSubtopicsForTopic } from './subtopicConfig';
 
 const COYOTE_TIME = 150; // ms
 const ENEMY_SPEED = 2.0;
@@ -26,6 +27,13 @@ const App: React.FC = () => {
   const [showHint, setShowHint] = useState(false);
   const [showFunFact, setShowFunFact] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | undefined>(undefined);
+
+  // Wheel-related state
+  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [wheelSegments, setWheelSegments] = useState<WheelSegment[]>([]);
+  const [selectedSubtopic, setSelectedSubtopic] = useState<string>('');
+  const [showSubtopicReveal, setShowSubtopicReveal] = useState(false);
+  const [wheelKey, setWheelKey] = useState(0); // Key to force wheel remount
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number>(undefined);
@@ -52,15 +60,15 @@ const App: React.FC = () => {
 
   // Game entities
   const playerRef = useRef({
-    pos: { x: 120, y: 904 },
+    pos: { x: 120, y: 888 },
     vel: { x: 0, y: 0 },
-    width: 64,
-    height: 96,
+    width: 96,
+    height: 144,
     grounded: false,
     lastGroundedTime: 0,
     facing: 1 as 1 | -1,
     lastHitTime: 0,
-    prevPos: { x: 120, y: 904 },
+    prevPos: { x: 120, y: 888 },
     respawnTime: 0,
     isHit: false,
     hitAnimationTimer: 0
@@ -123,8 +131,8 @@ const App: React.FC = () => {
 
     blocksRef.current = blocks;
     enemiesRef.current = enemies;
-    playerRef.current.pos = { x: 120, y: 904 };
-    playerRef.current.prevPos = { x: 120, y: 904 };
+    playerRef.current.pos = { x: 120, y: 888 };
+    playerRef.current.prevPos = { x: 120, y: 888 };
     playerRef.current.vel = { x: 0, y: 0 };
   }, []);
 
@@ -148,38 +156,31 @@ const App: React.FC = () => {
       height: 240
     });
     blocksRef.current = blocks;
-    playerRef.current.pos = { x: 120, y: 904 };
-    playerRef.current.prevPos = { x: 120, y: 904 };
+    playerRef.current.pos = { x: 120, y: 888 };
+    playerRef.current.prevPos = { x: 120, y: 888 };
     audioService.playSuccess();
   }, []);
 
   const handleStart = async (topic: string, selectedDifficulty?: 'easy' | 'medium' | 'hard') => {
-    setGameState(GameState.LOADING);
+    setSelectedTopic(topic);
     setLives(INITIAL_LIVES);
     setDifficulty(selectedDifficulty);
 
-    try {
-      // Fetch ALL questions from database with optional difficulty filter
-      const fetched = await getRandomQuestions(100, topic, selectedDifficulty); // Fetch up to 100 questions
+    // Get subtopics for the selected topic
+    const subtopics = getSubtopicsForTopic(topic);
 
-      if (fetched.length === 0) {
-        const difficultyMsg = selectedDifficulty ? ` (${selectedDifficulty} difficulty)` : '';
-        alert(`No questions found for topic: "${topic}"${difficultyMsg}. Please try a different topic or add questions to the database first.`);
-        setGameState(GameState.MENU);
-        return;
-      }
+    // Create wheel segments
+    const segments: WheelSegment[] = subtopics.map((subtopic, index) => ({
+      id: index,
+      label: `Choice ${index + 1}`,
+      subtopic: subtopic.name,
+      color: subtopic.color,
+      startAngle: (index * 360) / subtopics.length,
+      endAngle: ((index + 1) * 360) / subtopics.length
+    }));
 
-      setQuestions(fetched);
-      setCurrentQuestionIndex(0);
-      setShowHint(false);
-      setShowFunFact(false);
-      initLevel(fetched[0]);
-      setGameState(GameState.PLAYING);
-    } catch (error) {
-      console.error('Error loading questions from database:', error);
-      alert('Failed to load questions from database. Please check your connection.');
-      setGameState(GameState.MENU);
-    }
+    setWheelSegments(segments);
+    setGameState(GameState.WHEEL_SPINNING);
   };
 
   const handlePause = () => {
@@ -212,6 +213,48 @@ const App: React.FC = () => {
   const handleToggleHint = () => {
     // Just toggle hint - the update loop will skip when hint is showing
     setShowHint(!showHint);
+  };
+
+  const handleWheelComplete = (subtopic: string) => {
+    setSelectedSubtopic(subtopic);
+    setShowSubtopicReveal(true);
+  };
+
+  const handleSpinAgain = () => {
+    // Hide the reveal popup and reset to show the wheel again
+    setShowSubtopicReveal(false);
+    setSelectedSubtopic('');
+    // Increment key to force wheel component to remount with fresh state
+    setWheelKey(prev => prev + 1);
+    // Stay in WHEEL_SPINNING state so user sees the wheel with SPIN button
+  };
+
+  const handleSubtopicRevealContinue = async () => {
+    setShowSubtopicReveal(false);
+    setGameState(GameState.LOADING);
+
+    try {
+      // Fetch questions filtered by topic, subtopic, and difficulty
+      const fetched = await getRandomQuestions(100, selectedTopic, difficulty, selectedSubtopic);
+
+      if (fetched.length === 0) {
+        const difficultyMsg = difficulty ? ` (${difficulty} difficulty)` : '';
+        alert(`No questions found for topic: \"${selectedTopic}\", subtopic: \"${selectedSubtopic}\"${difficultyMsg}. Please add questions to the database first.`);
+        setGameState(GameState.MENU);
+        return;
+      }
+
+      setQuestions(fetched);
+      setCurrentQuestionIndex(0);
+      setShowHint(false);
+      setShowFunFact(false);
+      initLevel(fetched[0]);
+      setGameState(GameState.PLAYING);
+    } catch (error) {
+      console.error('Error loading questions from database:', error);
+      alert('Failed to load questions from database. Please check your connection.');
+      setGameState(GameState.MENU);
+    }
   };
 
   // Initialize input handling hook after handlers are defined
@@ -409,7 +452,7 @@ const App: React.FC = () => {
           player.vel.y = JUMP_STRENGTH * 0.6; // Bounce
           audioService.playStomp();
         } else {
-          // Hit from side - Player loses life, enemy survives (classic Mario behavior)
+          // Hit from side - Player loses life, enemy survives (classic platformer behavior)
           if (now - player.lastHitTime > INVULNERABILITY_TIME) {
             player.lastHitTime = now;
 
@@ -418,8 +461,8 @@ const App: React.FC = () => {
             player.hitAnimationTimer = 0;
 
             // Apply penalty/reset immediately
-            player.pos = { x: 120, y: 904 };
-            player.prevPos = { x: 120, y: 904 };
+            player.pos = { x: 120, y: 888 };
+            player.prevPos = { x: 120, y: 888 };
             player.vel = { x: 0, y: 0 };
             player.respawnTime = now;
             audioService.playIncorrect();
@@ -452,7 +495,7 @@ const App: React.FC = () => {
       player.isHit = true;
       player.hitAnimationTimer = 0;
 
-      player.pos = { x: 120, y: 904 };
+      player.pos = { x: 120, y: 888 };
       player.vel = { x: 0, y: 0 };
       player.respawnTime = now;
       audioService.playIncorrect();
@@ -494,27 +537,33 @@ const App: React.FC = () => {
           break;
 
         case 'PIPE':
-          // Green pipe body
-          ctx.fillStyle = '#2ECC40';
+          // Blue elevator/portal with door lines
+          ctx.fillStyle = '#4A90E2';
           ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-          // Pipe rim (top)
-          ctx.fillStyle = '#01FF70';
+          // Elevator rim (top)
+          ctx.fillStyle = '#7AB8FF';
           ctx.fillRect(block.pos.x - 8, block.pos.y, block.width + 16, 16);
-          // Pipe outline
-          ctx.strokeStyle = '#1a8c26';
+          // Elevator outline
+          ctx.strokeStyle = '#2E5C8A';
           ctx.lineWidth = 3;
           ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
-          // Vertical line in middle
+          // Elevator door lines (vertical lines to simulate doors)
+          ctx.strokeStyle = '#2E5C8A';
+          ctx.lineWidth = 4;
           ctx.beginPath();
-          ctx.moveTo(block.pos.x + block.width / 2, block.pos.y + 16);
-          ctx.lineTo(block.pos.x + block.width / 2, block.pos.y + block.height);
+          ctx.moveTo(block.pos.x + block.width / 2 - 2, block.pos.y + 16);
+          ctx.lineTo(block.pos.x + block.width / 2 - 2, block.pos.y + block.height);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(block.pos.x + block.width / 2 + 2, block.pos.y + 16);
+          ctx.lineTo(block.pos.x + block.width / 2 + 2, block.pos.y + block.height);
           ctx.stroke();
           break;
 
         case 'QUESTION':
-          // Mario-style question block with orange color and rounded appearance
-          const blockColor = block.isHit ? COLORS.HIT_BLOCK : '#E89C3C'; // Orange color
-          const darkBorder = block.isHit ? '#404040' : '#C67A28'; // Darker orange border
+          // Question crate with wooden texture
+          const blockColor = block.isHit ? COLORS.HIT_BLOCK : '#8B7355'; // Wooden brown
+          const darkBorder = block.isHit ? '#404040' : '#5D4E37'; // Darker brown border
 
           // Draw main block with rounded corners effect
           ctx.fillStyle = blockColor;
@@ -527,7 +576,7 @@ const App: React.FC = () => {
 
           if (!block.isHit) {
             // Add 3D beveled effect - top and left highlights
-            ctx.strokeStyle = '#FFD89C';
+            ctx.strokeStyle = '#B8A68A';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(block.pos.x + 6, block.pos.y + block.height - 6);
@@ -536,7 +585,7 @@ const App: React.FC = () => {
             ctx.stroke();
 
             // Bottom and right shadows
-            ctx.strokeStyle = '#B87A28';
+            ctx.strokeStyle = '#4A3C28';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(block.pos.x + block.width - 6, block.pos.y + 6);
@@ -544,18 +593,8 @@ const App: React.FC = () => {
             ctx.lineTo(block.pos.x + 6, block.pos.y + block.height - 6);
             ctx.stroke();
 
-            // Draw corner dots (classic Mario question block style)
-            ctx.fillStyle = '#B87A28';
-            const dotSize = 4;
-            const dotOffset = 12;
-            // Top-left dot
-            ctx.fillRect(block.pos.x + dotOffset, block.pos.y + dotOffset, dotSize, dotSize);
-            // Top-right dot
-            ctx.fillRect(block.pos.x + block.width - dotOffset - dotSize, block.pos.y + dotOffset, dotSize, dotSize);
-            // Bottom-left dot
-            ctx.fillRect(block.pos.x + dotOffset, block.pos.y + block.height - dotOffset - dotSize, dotSize, dotSize);
-            // Bottom-right dot
-            ctx.fillRect(block.pos.x + block.width - dotOffset - dotSize, block.pos.y + block.height - dotOffset - dotSize, dotSize, dotSize);
+            // Remove corner dots - no longer using Mario brick pattern
+            // Dots removed for legal safety
 
             // Draw the letter (A, B, C, D)
             ctx.fillStyle = '#000';
@@ -591,11 +630,24 @@ const App: React.FC = () => {
           break;
 
         case 'CASTLE':
-          ctx.fillStyle = COLORS.CASTLE;
+          // Modern trophy/building
+          ctx.fillStyle = '#FFD700'; // Gold
           ctx.fillRect(block.pos.x, block.pos.y, block.width, block.height);
-          ctx.fillStyle = '#000';
-          ctx.fillRect(block.pos.x + block.width / 2 - 15, block.pos.y + block.height - 40, 30, 40);
-          for (let i = 0; i < 4; i++) ctx.fillRect(block.pos.x + i * 35, block.pos.y - 20, 15, 20);
+          // Trophy cup detail
+          ctx.fillStyle = '#FFA500';
+          ctx.fillRect(block.pos.x + block.width / 2 - 30, block.pos.y + 40, 60, 80);
+          // Trophy base
+          ctx.fillStyle = '#8B7355';
+          ctx.fillRect(block.pos.x + block.width / 2 - 40, block.pos.y + block.height - 40, 80, 40);
+          // Trophy handles
+          ctx.strokeStyle = '#FFA500';
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.arc(block.pos.x + block.width / 2 - 50, block.pos.y + 80, 20, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(block.pos.x + block.width / 2 + 50, block.pos.y + 80, 20, 0, Math.PI * 2);
+          ctx.stroke();
           break;
       }
     });
@@ -652,6 +704,13 @@ const App: React.FC = () => {
           onDismissFunFact={handleDismissFunFact}
           difficulty={difficulty}
           onDifficultyChange={setDifficulty}
+          wheelSegments={wheelSegments}
+          wheelKey={wheelKey}
+          onWheelComplete={handleWheelComplete}
+          selectedSubtopic={selectedSubtopic}
+          showSubtopicReveal={showSubtopicReveal}
+          onSubtopicRevealContinue={handleSubtopicRevealContinue}
+          onSpinAgain={handleSpinAgain}
         />
       </div>
     </div>
