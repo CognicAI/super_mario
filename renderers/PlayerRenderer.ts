@@ -15,7 +15,7 @@ let imageLoaded = false;
 // Initialize image loading
 if (typeof window !== 'undefined') {
     playerImage = new Image();
-    playerImage.src = '/assets/player.png';
+    playerImage.src = '/player.png';
     playerImage.onload = () => {
         imageLoaded = true;
     };
