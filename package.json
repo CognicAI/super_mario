@@ -13,7 +13,6 @@
     "@lottiefiles/dotlottie-react": "^0.17.13",
     "@supabase/supabase-js": "^2.90.1",
     "react": "^19.2.3",
-    "react-dice-roll": "^1.2.2",
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
