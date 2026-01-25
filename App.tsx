@@ -12,10 +12,14 @@ import { useInput } from './hooks/useInput';
 import { getSubtopicsForTopic } from './subtopicConfig';
 
 const COYOTE_TIME = 150; // ms
-const ENEMY_SPEED = 2.0;
+const ENEMY_SPEED = 3.5;
 const INITIAL_LIVES = 3;
 const INVULNERABILITY_TIME = 1000;
 const RESPAWN_DELAY = 1000; // ms - time player cannot control character after respawn
+
+// Load background image
+const backgroundImage = new Image();
+backgroundImage.src = '/Background.png';
 
 
 const App: React.FC = () => {
@@ -60,7 +64,7 @@ const App: React.FC = () => {
 
   // Game entities
   const playerRef = useRef({
-    pos: { x: 120, y: 888 },
+    pos: { x: 50, y: 888 },
     vel: { x: 0, y: 0 },
     width: 96,
     height: 144,
@@ -68,7 +72,7 @@ const App: React.FC = () => {
     lastGroundedTime: 0,
     facing: 1 as 1 | -1,
     lastHitTime: 0,
-    prevPos: { x: 120, y: 888 },
+    prevPos: { x: 50, y: 888 },
     respawnTime: 0,
     isHit: false,
     hitAnimationTimer: 0
@@ -76,11 +80,22 @@ const App: React.FC = () => {
 
   const blocksRef = useRef<Block[]>([]);
   const enemiesRef = useRef<Enemy[]>([]);
+  const secondEnemySpawnedRef = useRef(false); // Track if second enemy has been spawned
 
 
   const initLevel = useCallback((question: Question) => {
     const blocks: Block[] = [];
     const enemies: Enemy[] = [];
+
+    blocks.push({
+      type: 'PIPE',
+      pos: { x: 200, y: CANVAS_HEIGHT - TILE_SIZE - 128 },
+      vel: { x: 0, y: 0 },
+      width: 96,
+      height: 128
+    });
+
+
 
     // Floor
     for (let i = 0; i < CANVAS_WIDTH / TILE_SIZE; i++) {
@@ -100,7 +115,7 @@ const App: React.FC = () => {
       blocks.push({
         type: 'QUESTION',
         label: opt,
-        pos: { x: (centerX - (question.options.length * blockSpacing) / 2) + idx * blockSpacing, y: 720 },
+        pos: { x: (centerX - (question.options.length * blockSpacing) / 2) + idx * blockSpacing, y: 650 },
         vel: { x: 0, y: 0 },
         width: TILE_SIZE,
         height: TILE_SIZE,
@@ -108,14 +123,6 @@ const App: React.FC = () => {
       });
     });
 
-    // Add pipe barrier between player and enemy zone
-    blocks.push({
-      type: 'PIPE',
-      pos: { x: 270, y: CANVAS_HEIGHT - TILE_SIZE - 128 },
-      vel: { x: 0, y: 0 },
-      width: 96,
-      height: 128
-    });
 
     // Enemy - starts on the right, patrols within safe zone
     enemies.push({
@@ -131,8 +138,9 @@ const App: React.FC = () => {
 
     blocksRef.current = blocks;
     enemiesRef.current = enemies;
-    playerRef.current.pos = { x: 120, y: 888 };
-    playerRef.current.prevPos = { x: 120, y: 888 };
+    secondEnemySpawnedRef.current = false; // Reset second enemy spawn flag
+    playerRef.current.pos = { x: 50, y: 888 };
+    playerRef.current.prevPos = { x: 50, y: 888 };
     playerRef.current.vel = { x: 0, y: 0 };
   }, []);
 
@@ -156,8 +164,8 @@ const App: React.FC = () => {
       height: 240
     });
     blocksRef.current = blocks;
-    playerRef.current.pos = { x: 120, y: 888 };
-    playerRef.current.prevPos = { x: 120, y: 888 };
+    playerRef.current.pos = { x: 50, y: 888 };
+    playerRef.current.prevPos = { x: 50, y: 888 };
     audioService.playSuccess();
   }, []);
 
@@ -382,10 +390,12 @@ const App: React.FC = () => {
             block.isHit = true;
             const currentQ = questionsRef.current[currentQuestionIndexRef.current];
             if (block.label === currentQ.correctAnswer) {
-              setFeedback('CORRECT!');
+              block.isCorrect = true; // Mark as correct
+              // Don't show "CORRECT!" feedback, just show fun fact directly
               setShowFunFact(true);
               audioService.playCorrect();
             } else {
+              block.isCorrect = false; // Mark as wrong
               setFeedback('TRY AGAIN!');
               audioService.playIncorrect();
               setTimeout(() => {
@@ -422,6 +432,21 @@ const App: React.FC = () => {
       if (enemy.isDead) {
         enemy.deadTimer += timeScale; // Scale animation timer
         return;
+      }
+
+      // Check if first enemy has reached midpoint and spawn second enemy
+      if (!secondEnemySpawnedRef.current && enemy.pos.x <= CANVAS_WIDTH / 2) {
+        secondEnemySpawnedRef.current = true;
+        enemiesRef.current.push({
+          type: 'GOOMBA',
+          pos: { x: CANVAS_WIDTH - 300, y: CANVAS_HEIGHT - TILE_SIZE - 64 },
+          vel: { x: -ENEMY_SPEED, y: 0 },
+          width: 64,
+          height: 64,
+          isDead: false,
+          deadTimer: 0,
+          facing: -1
+        });
       }
 
       // Patrol within safe boundaries (don't overlap with pipe or go to player spawn)
@@ -461,8 +486,8 @@ const App: React.FC = () => {
             player.hitAnimationTimer = 0;
 
             // Apply penalty/reset immediately
-            player.pos = { x: 120, y: 888 };
-            player.prevPos = { x: 120, y: 888 };
+            player.pos = { x: 50, y: 888 };
+            player.prevPos = { x: 50, y: 888 };
             player.vel = { x: 0, y: 0 };
             player.respawnTime = now;
             audioService.playIncorrect();
@@ -495,7 +520,7 @@ const App: React.FC = () => {
       player.isHit = true;
       player.hitAnimationTimer = 0;
 
-      player.pos = { x: 120, y: 888 };
+      player.pos = { x: 50, y: 888 };
       player.vel = { x: 0, y: 0 };
       player.respawnTime = now;
       audioService.playIncorrect();
@@ -522,8 +547,13 @@ const App: React.FC = () => {
 
 
   const draw = useCallback((ctx: CanvasRenderingContext2D) => {
-    ctx.fillStyle = COLORS.SKY;
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    // Draw background image if loaded, otherwise use fallback color
+    if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
+      ctx.drawImage(backgroundImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    } else {
+      ctx.fillStyle = COLORS.SKY;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    }
 
     drawEnvironment(ctx, CANVAS_HEIGHT, TILE_SIZE);
 
@@ -561,22 +591,28 @@ const App: React.FC = () => {
           break;
 
         case 'QUESTION':
-          // Question crate with wooden texture
-          const blockColor = block.isHit ? COLORS.HIT_BLOCK : '#8B7355'; // Wooden brown
-          const darkBorder = block.isHit ? '#404040' : '#5D4E37'; // Darker brown border
+          // Question block with new color scheme
+          let blockColor = '#2B2E4A'; // Default: deep indigo
+          let borderColor = '#FACC15'; // Default: yellow
 
-          // Draw main block with rounded corners effect
+          if (block.isHit && !block.isCorrect) {
+            // Only change color for wrong answers
+            blockColor = '#FB7185'; // Wrong: pink
+            borderColor = '#FB7185';
+          }
+
+          // Draw main block
           ctx.fillStyle = blockColor;
           ctx.fillRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
 
-          // Draw darker border/outline
-          ctx.strokeStyle = darkBorder;
+          // Draw border/outline
+          ctx.strokeStyle = borderColor;
           ctx.lineWidth = 4;
           ctx.strokeRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
 
           if (!block.isHit) {
             // Add 3D beveled effect - top and left highlights
-            ctx.strokeStyle = '#B8A68A';
+            ctx.strokeStyle = '#FACC15';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(block.pos.x + 6, block.pos.y + block.height - 6);
@@ -585,7 +621,7 @@ const App: React.FC = () => {
             ctx.stroke();
 
             // Bottom and right shadows
-            ctx.strokeStyle = '#4A3C28';
+            ctx.strokeStyle = '#1A1D33';
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.moveTo(block.pos.x + block.width - 6, block.pos.y + 6);
@@ -593,11 +629,8 @@ const App: React.FC = () => {
             ctx.lineTo(block.pos.x + 6, block.pos.y + block.height - 6);
             ctx.stroke();
 
-            // Remove corner dots - no longer using Mario brick pattern
-            // Dots removed for legal safety
-
             // Draw the letter (A, B, C, D)
-            ctx.fillStyle = '#000';
+            ctx.fillStyle = '#FFFFFF'; // White text
             ctx.font = 'bold 48px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';

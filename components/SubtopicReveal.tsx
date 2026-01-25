@@ -22,7 +22,7 @@ const SubtopicReveal: React.FC<SubtopicRevealProps> = ({ subtopic, onContinue, o
                         onClick={onSpinAgain}
                         className="bg-yellow-500 hover:bg-yellow-600 text-black px-12 py-6 text-3xl border-b-8 border-yellow-700 active:border-b-0 active:translate-y-2 transition-all uppercase font-bold"
                     >
-                        Spin Again
+                        Roll Again
                     </button>
                     <button
                         onClick={onContinue}

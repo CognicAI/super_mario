@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { GameState, Question, WheelSegment } from '../types';
-import SpinningWheel from './SpinningWheel';
+import DiceRoll from './DiceRoll';
 import SubtopicReveal from './SubtopicReveal';
 
 interface GameUIProps {
@@ -114,30 +114,16 @@ const GameUI: React.FC<GameUIProps> = ({
   if (gameState === GameState.MENU) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-12 z-50">
-        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Paymaster <br></br>Finance Quest</h1>
+        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Super Pay Pay<br></br>Finance Quest</h1>
         <div className="w-full max-w-3xl">
-          <label className="block text-xl mb-2" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>SELECT TOPIC:</label>
           <div className="flex gap-4 justify-center mb-4">
             <button
-              onClick={() => setTopic('Bookkeeping')}
-              className={`flex-1 px-8 py-6 text-xl font-bold rounded border-b-8 transition-all ${topic === 'Bookkeeping'
-                ? 'bg-yellow-500 text-black border-yellow-700 shadow-lg scale-105'
-                : 'bg-gray-600 text-white border-gray-800 hover:bg-gray-500'
-                }`}
+              className="flex-1 px-8 py-6 text-xl font-bold rounded border-b-8 bg-yellow-500 text-black border-yellow-700 shadow-lg scale-105 cursor-default"
             >
-              BOOKKEEPING
-            </button>
-            <button
-              onClick={() => setTopic('Source to Pay')}
-              className={`flex-1 px-8 py-6 text-xl font-bold rounded border-b-8 transition-all ${topic === 'Source to Pay'
-                ? 'bg-yellow-500 text-black border-yellow-700 shadow-lg scale-105'
-                : 'bg-gray-600 text-white border-gray-800 hover:bg-gray-500'
-                }`}
-            >
-              SOURCE TO PAY
+              BOOKKEEPING - SOURCE TO PAY
             </button>
           </div>
-          <p className="text-sm text-gray-400 mb-4">Questions are loaded from database for: <span className="text-yellow-400">{topic}</span></p>
+          <p className="text-sm text-gray-400 mb-4">Questions are loaded from database for: <span className="text-yellow-400">Source to Pay</span></p>
 
           {/* Difficulty Selector - HIDDEN: Hardcoded to fetch all questions */}
           {/* Uncomment below to re-enable difficulty selection */}
@@ -186,7 +172,7 @@ const GameUI: React.FC<GameUIProps> = ({
           */}
 
           <button
-            onClick={() => onStart(topic, undefined)} // Hardcoded to undefined = fetch all questions
+            onClick={() => onStart('Source to Pay', undefined)} // Hardcoded to "Source to Pay"
             className="w-full bg-red-600 hover:bg-red-700 text-white p-6 text-3xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all"
           >
             START GAME
@@ -205,11 +191,11 @@ const GameUI: React.FC<GameUIProps> = ({
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-purple-900 to-blue-900 text-white z-50">
         <h1 className="text-6xl mb-8 text-yellow-400 uppercase" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>
-          Spin the Wheel!
+          Roll the Dice!
         </h1>
-        <p className="text-2xl mb-8 text-white/80">Let's discover your quiz topic!</p>
+        <p className="text-2xl mb-8 text-white/80">Let's discover your subtopic!</p>
         {wheelSegments.length > 0 && onWheelComplete && (
-          <SpinningWheel
+          <DiceRoll
             key={wheelKey}
             segments={wheelSegments}
             onSpinComplete={onWheelComplete}
@@ -268,35 +254,36 @@ const GameUI: React.FC<GameUIProps> = ({
   return (
     <div className="absolute inset-0 pointer-events-none p-8">
       {/* HUD */}
-      <div className="flex justify-between items-start text-white text-2xl">
+      <div className="flex items-start text-white text-2xl">
+        {/* Left side - Score and Lifelines */}
         <div className="flex flex-col gap-4">
           <div>
-            <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>ASSETS</div>
+            <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>SCORE</div>
             <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>{score.toString().padStart(6, '0')}</div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>ATTEMPTS: {lives}</span>
+            <span className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>LIFELINES:{lives}</span>
           </div>
         </div>
-        <div className="text-center max-w-3xl">
-          <div className="text-yellow-300 mb-3 uppercase text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>QUESTION {currentQuestionIndex + 1}/{totalQuestions}</div>
-          <div className="bg-blue-600/80 backdrop-blur-sm p-6 border-4 border-white rounded shadow-lg text-xl leading-8 text-white uppercase" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>
-            {currentQuestion?.text}
-          </div>
 
-          {/* Hint Button */}
-          {currentQuestion?.hint && !showHint && (
-            <button
-              onClick={onToggleHint}
-              className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-black px-6 py-3 text-lg font-bold rounded border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all pointer-events-auto uppercase"
-            >
-              💡 Need a Hint?
-            </button>
-          )}
-        </div>
-        <div>
-          <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>LEVEL</div>
-          <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>1</div>
+        {/* Centered - Question and Hint */}
+        <div className="flex-1 flex flex-col items-center justify-start">
+          <div className="text-center max-w-3xl w-full">
+            <div className="text-yellow-300 mb-3 uppercase text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>QUESTION {currentQuestionIndex + 1}/{totalQuestions}</div>
+            <div className="bg-blue-600/80 backdrop-blur-sm p-6 border-4 border-white rounded shadow-lg text-xl leading-8 text-white uppercase" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>
+              {currentQuestion?.text}
+            </div>
+
+            {/* Hint Button */}
+            {currentQuestion?.hint && !showHint && (
+              <button
+                onClick={onToggleHint}
+                className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-black px-6 py-3 text-lg font-bold rounded border-b-4 border-yellow-700 active:border-b-0 active:translate-y-1 transition-all pointer-events-auto uppercase"
+              >
+                💡 Need a Hint?
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -329,7 +316,7 @@ const GameUI: React.FC<GameUIProps> = ({
       )}
 
       {/* Fun Fact Display - Click or Press Any Key to Dismiss */}
-      {showFunFact && currentQuestion?.funFact && feedback === 'CORRECT!' && (
+      {showFunFact && currentQuestion?.funFact && (
         <div
           onClick={() => canDismissFunFact && onDismissFunFact()}
           className={`absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-50 pointer-events-auto ${canDismissFunFact ? 'cursor-pointer' : 'cursor-wait'}`}

@@ -1,4 +1,3 @@
-
 export interface Question {
   id: number;
   text: string;
@@ -57,6 +56,7 @@ export interface Block extends Entity {
   type: 'QUESTION' | 'FLOOR' | 'CASTLE' | 'BRICK' | 'HIDDEN' | 'PIPE';
   label?: string;
   isHit?: boolean;
+  isCorrect?: boolean; // Track if this was the correct answer
 }
 
 export interface Enemy extends Entity {
