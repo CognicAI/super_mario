@@ -7,11 +7,11 @@ export interface SubtopicConfig {
 // Source to Pay subtopics
 export const SOURCE_TO_PAY_SUBTOPICS: SubtopicConfig[] = [
     { name: 'Need for product or service', color: '#FF6B6B' },
-    { name: 'Sourcing and selecting Suppliers', color: '#4ECDC4' },
+    { name: 'Sourcing and Selecting suppliers', color: '#4ECDC4' },
     { name: 'Creating PO', color: '#FFE66D' },
-    { name: 'Receipt of G&S', color: '#95E1D3' },
-    { name: 'Managing Invoices', color: '#F38181' },
-    { name: 'Processing Payments and Receipt of G&S', color: '#AA96DA' }
+    { name: 'Receipt of Goods & Services', color: '#95E1D3' },
+    { name: 'Managing invoices', color: '#F38181' },
+    { name: 'Processing payments', color: '#AA96DA' }
 ];
 
 // Bookkeeping subtopics (placeholder - user will add questions)
