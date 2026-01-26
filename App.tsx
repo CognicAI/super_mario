@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GameState, Question, Block, Enemy, Vector2D, WheelSegment } from './types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, TILE_SIZE, COLORS, GRAVITY, JUMP_STRENGTH, MOVE_SPEED } from './constants';
 import { getRandomQuestions } from './services/databaseService';
-import { audioService } from './services/audioService';
+
 import GameUI from './components/GameUI';
 import { drawPlayer } from './renderers/PlayerRenderer';
 import { drawEnemy } from './renderers/EnemyRenderer';
@@ -166,7 +166,7 @@ const App: React.FC = () => {
     blocksRef.current = blocks;
     playerRef.current.pos = { x: 50, y: 888 };
     playerRef.current.prevPos = { x: 50, y: 888 };
-    audioService.playSuccess();
+
   }, []);
 
   const handleStart = async (topic: string, selectedDifficulty?: 'easy' | 'medium' | 'hard') => {
@@ -311,7 +311,7 @@ const App: React.FC = () => {
         player.vel.y = JUMP_STRENGTH;
         player.grounded = false;
         player.lastGroundedTime = 0;
-        audioService.playJump();
+
       }
 
       if (!jumpPressed && player.vel.y < 0) {
@@ -383,7 +383,7 @@ const App: React.FC = () => {
           // Moving up, hit bottom of block (CEILING COLLISION)
           player.pos.y = block.pos.y + block.height; // Snap DOWN to ceiling bottom
           player.vel.y = 0;
-          audioService.playHit();
+
 
           // Question block logic
           if (block.type === 'QUESTION' && !block.isHit && gameStateRef.current === GameState.PLAYING && !feedbackRef.current) {
@@ -393,11 +393,11 @@ const App: React.FC = () => {
               block.isCorrect = true; // Mark as correct
               // Don't show "CORRECT!" feedback, just show fun fact directly
               setShowFunFact(true);
-              audioService.playCorrect();
+
             } else {
               block.isCorrect = false; // Mark as wrong
               setFeedback('TRY AGAIN!');
-              audioService.playIncorrect();
+
               setTimeout(() => {
                 setFeedback(null);
                 block.isHit = false;
@@ -475,7 +475,7 @@ const App: React.FC = () => {
         if (player.vel.y > 0 && player.pos.y + player.height < enemy.pos.y + enemy.height / 2) {
           enemy.isDead = true;
           player.vel.y = JUMP_STRENGTH * 0.6; // Bounce
-          audioService.playStomp();
+
         } else {
           // Hit from side - Player loses life, enemy survives (classic platformer behavior)
           if (now - player.lastHitTime > INVULNERABILITY_TIME) {
@@ -490,7 +490,7 @@ const App: React.FC = () => {
             player.prevPos = { x: 50, y: 888 };
             player.vel = { x: 0, y: 0 };
             player.respawnTime = now;
-            audioService.playIncorrect();
+
 
             // Handle life loss
             setLives(prev => {
@@ -523,7 +523,7 @@ const App: React.FC = () => {
       player.pos = { x: 50, y: 888 };
       player.vel = { x: 0, y: 0 };
       player.respawnTime = now;
-      audioService.playIncorrect();
+
 
       setLives(prev => {
         const nextLives = prev - 1;
