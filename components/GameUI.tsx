@@ -55,7 +55,7 @@ const GameUI: React.FC<GameUIProps> = ({
   onSubtopicRevealContinue,
   onSpinAgain
 }) => {
-  const [topic, setTopic] = React.useState('Source to Pay');
+  const [topic, setTopic] = React.useState('source to pay');
   const [loadingDots, setLoadingDots] = React.useState(0);
   const [canDismissFunFact, setCanDismissFunFact] = React.useState(false);
   const [remainingTime, setRemainingTime] = React.useState(2);
