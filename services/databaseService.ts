@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Question, QuestionRow } from '../types';
+import { SOURCE_TO_PAY_SUBTOPICS } from '../subtopicConfig';
 
 // Initialize Supabase client
 // Note: Add these to your .env.local file:
@@ -19,6 +20,27 @@ function getSupabaseClient(): SupabaseClient {
         supabase = createClient(supabaseUrl, supabaseAnonKey);
     }
     return supabase;
+}
+
+/**
+ * Normalize subtopic name to match canonical configuration
+ */
+function normalizeSubtopic(subtopic: string | null): string | undefined {
+    if (!subtopic) return undefined;
+
+    const trimmed = subtopic.trim();
+    const normalizedLower = trimmed.toLowerCase();
+
+    // Check against Source to Pay subtopics (case-insensitive)
+    const match = SOURCE_TO_PAY_SUBTOPICS.find(
+        st => st.name.trim().toLowerCase() === normalizedLower
+    );
+
+    if (match) {
+        return match.name;
+    }
+
+    return trimmed;
 }
 
 /**
@@ -43,7 +65,7 @@ function rowToQuestion(row: QuestionRow): Question {
         hint: row.hint || undefined,
         funFact: row.fun_fact || undefined,
         topic: row.topic,
-        subtopic: row.subtopic || undefined,
+        subtopic: normalizeSubtopic(row.subtopic),
         difficulty: row.difficulty || undefined,
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at)
