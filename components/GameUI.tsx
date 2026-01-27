@@ -28,6 +28,7 @@ interface GameUIProps {
   showSubtopicReveal?: boolean;
   onSubtopicRevealContinue?: () => void;
   onSpinAgain?: () => void;
+  onBack?: () => void;
 }
 
 const GameUI: React.FC<GameUIProps> = ({
@@ -53,7 +54,8 @@ const GameUI: React.FC<GameUIProps> = ({
   selectedSubtopic,
   showSubtopicReveal,
   onSubtopicRevealContinue,
-  onSpinAgain
+  onSpinAgain,
+  onBack
 }) => {
   const [topic, setTopic] = React.useState('source to pay');
   const [loadingDots, setLoadingDots] = React.useState(0);
@@ -123,8 +125,6 @@ const GameUI: React.FC<GameUIProps> = ({
               BOOKKEEPING - SOURCE TO PAY
             </button>
           </div>
-          <p className="text-sm text-gray-400 mb-4">Questions are loaded from database for: <span className="text-yellow-400">Source to Pay</span></p>
-
           {/* Difficulty Selector - HIDDEN: Hardcoded to fetch all questions */}
           {/* Uncomment below to re-enable difficulty selection */}
           {/*
@@ -199,6 +199,7 @@ const GameUI: React.FC<GameUIProps> = ({
             key={wheelKey}
             segments={wheelSegments}
             onSpinComplete={onWheelComplete}
+            onBack={onBack}
           />
         )}
         {showSubtopicReveal && selectedSubtopic && onSubtopicRevealContinue && (
@@ -259,7 +260,7 @@ const GameUI: React.FC<GameUIProps> = ({
         <div className="flex flex-col gap-4">
           <div>
             <div className="text-yellow-300 mb-2 text-xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>SCORE</div>
-            <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>{score.toString().padStart(6, '0')}</div>
+            <div className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>{score.toString().padStart(4, '0')}</div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-2xl" style={{ WebkitTextStroke: '2px black', paintOrder: 'stroke fill' }}>LIFELINES:{lives}</span>

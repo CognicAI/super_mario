@@ -744,6 +744,7 @@ const App: React.FC = () => {
           showSubtopicReveal={showSubtopicReveal}
           onSubtopicRevealContinue={handleSubtopicRevealContinue}
           onSpinAgain={handleSpinAgain}
+          onBack={() => setGameState(GameState.MENU)}
         />
       </div>
     </div>

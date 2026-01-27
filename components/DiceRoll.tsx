@@ -5,13 +5,14 @@ import { WheelSegment } from '../types';
 interface DiceRollProps {
     segments: WheelSegment[];
     onSpinComplete: (subtopic: string) => void;
+    onBack?: () => void;
 }
 
-const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete }) => {
+const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete, onBack }) => {
     const [isRolling, setIsRolling] = useState(false);
     const [diceResult, setDiceResult] = useState<number | null>(null);
-    // Default rotation to show face 1 cleanly
-    const [rotation, setRotation] = useState({ x: 0, y: 0 });
+    // Default rotation to show face 6 cleanly
+    const [rotation, setRotation] = useState({ x: 0, y: 180 });
     const [showResult, setShowResult] = useState(false);
 
     // Map segments to dice numbers 1-6
@@ -92,7 +93,7 @@ const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete }) => {
                 if (mappedSegments[result - 1]) {
                     onSpinComplete(mappedSegments[result - 1].subtopic);
                 }
-            }, 1000);
+            }, 2000);
         }, 2000); // 2s duration matches CSS transition
     };
 
@@ -174,7 +175,7 @@ const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete }) => {
             {/* RIGHT SIDE: LIST AREA */}
             <div className="flex-[2]">
                 <h3 className="text-3xl font-bold text-yellow-400 mb-6 uppercase tracking-wider border-b-4 border-yellow-400/50 pb-2 inline-block">
-                    Source to Pay Steps:
+                    Source to Pay:
                 </h3>
                 <div className="flex flex-col gap-3">
                     {mappedSegments.map((seg, idx) => {
@@ -206,6 +207,16 @@ const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete }) => {
                     })}
                 </div>
             </div>
+
+            {/* BACK BUTTON */}
+            {onBack && (
+                <button
+                    onClick={onBack}
+                    className="absolute top-8 left-8 bg-black/40 hover:bg-black/60 text-white px-6 py-3 rounded-full font-bold uppercase tracking-wider border-2 border-white/20 transition-all z-20"
+                >
+                    ← Back
+                </button>
+            )}
 
             {/* INJECT CUSTOM STYLES for 3D Transforms that Tailwind might miss or for cleaner code */}
             <style>{`
