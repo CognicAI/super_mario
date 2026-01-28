@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [wheelKey, setWheelKey] = useState(0); // Key to force wheel remount
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const staticCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const requestRef = useRef<number>(undefined);
   const lastTimeRef = useRef<number>(0);
 
@@ -142,6 +143,28 @@ const App: React.FC = () => {
     playerRef.current.pos = { x: 50, y: 888 };
     playerRef.current.prevPos = { x: 50, y: 888 };
     playerRef.current.vel = { x: 0, y: 0 };
+
+    // Pre-calculate wrapped text for question blocks
+    blocks.forEach(block => {
+      if (block.type === 'QUESTION' && block.label) {
+        const words = block.label.split(' ');
+        const lines: string[] = [];
+        let currentLine = "";
+        words.forEach(word => {
+          if ((currentLine + word).length < 15) currentLine += (currentLine ? " " : "") + word;
+          else { lines.push(currentLine); currentLine = word; }
+        });
+        lines.push(currentLine);
+        block.cachedLines = lines.reverse();
+
+        // Calculate display index (A, B, C, D)
+        const blockIndex = blocks.filter(b => b.type === 'QUESTION').indexOf(block);
+        block.displayIndex = String.fromCharCode(65 + blockIndex);
+      }
+    });
+
+    // Render static world after a short delay to ensure images valid
+    setTimeout(renderStaticWorld, 100);
   }, []);
 
   const spawnCastleLevel = useCallback(() => {
@@ -165,8 +188,9 @@ const App: React.FC = () => {
     });
     blocksRef.current = blocks;
     playerRef.current.pos = { x: 50, y: 888 };
+    playerRef.current.pos = { x: 50, y: 888 };
     playerRef.current.prevPos = { x: 50, y: 888 };
-
+    setTimeout(renderStaticWorld, 100);
   }, []);
 
   const handleStart = async (topic: string, selectedDifficulty?: 'easy' | 'medium' | 'hard') => {
@@ -546,8 +570,14 @@ const App: React.FC = () => {
   }, [initLevel, spawnCastleLevel]); // Dependencies reduced significantly
 
 
-  const draw = useCallback((ctx: CanvasRenderingContext2D) => {
-    // Draw background image if loaded, otherwise use fallback color
+  const renderStaticWorld = useCallback(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw background
     if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
       ctx.drawImage(backgroundImage, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     } else {
@@ -577,7 +607,7 @@ const App: React.FC = () => {
           ctx.strokeStyle = '#2E5C8A';
           ctx.lineWidth = 3;
           ctx.strokeRect(block.pos.x, block.pos.y, block.width, block.height);
-          // Elevator door lines (vertical lines to simulate doors)
+          // Elevator door lines
           ctx.strokeStyle = '#2E5C8A';
           ctx.lineWidth = 4;
           ctx.beginPath();
@@ -588,78 +618,6 @@ const App: React.FC = () => {
           ctx.moveTo(block.pos.x + block.width / 2 + 2, block.pos.y + 16);
           ctx.lineTo(block.pos.x + block.width / 2 + 2, block.pos.y + block.height);
           ctx.stroke();
-          break;
-
-        case 'QUESTION':
-          // Question block with new color scheme
-          let blockColor = '#2B2E4A'; // Default: deep indigo
-          let borderColor = '#FACC15'; // Default: yellow
-
-          if (block.isHit && !block.isCorrect) {
-            // Only change color for wrong answers
-            blockColor = '#FB7185'; // Wrong: pink
-            borderColor = '#FB7185';
-          }
-
-          // Draw main block
-          ctx.fillStyle = blockColor;
-          ctx.fillRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
-
-          // Draw border/outline
-          ctx.strokeStyle = borderColor;
-          ctx.lineWidth = 4;
-          ctx.strokeRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
-
-          if (!block.isHit) {
-            // Add 3D beveled effect - top and left highlights
-            ctx.strokeStyle = '#FACC15';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(block.pos.x + 6, block.pos.y + block.height - 6);
-            ctx.lineTo(block.pos.x + 6, block.pos.y + 6);
-            ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + 6);
-            ctx.stroke();
-
-            // Bottom and right shadows
-            ctx.strokeStyle = '#1A1D33';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(block.pos.x + block.width - 6, block.pos.y + 6);
-            ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + block.height - 6);
-            ctx.lineTo(block.pos.x + 6, block.pos.y + block.height - 6);
-            ctx.stroke();
-
-            // Draw the letter (A, B, C, D)
-            ctx.fillStyle = '#FFFFFF'; // White text
-            ctx.font = 'bold 48px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            // Find the block index to determine which letter to display
-            const blockIndex = blocksRef.current.filter(b => b.type === 'QUESTION').indexOf(block);
-            const letter = String.fromCharCode(65 + blockIndex); // 65 is 'A' in ASCII
-            ctx.fillText(letter, block.pos.x + block.width / 2, block.pos.y + block.height / 2 + 2);
-          }
-
-          ctx.fillStyle = '#fff';
-          ctx.font = '18px "Press Start 2P"';
-          ctx.textAlign = 'center';
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 3;
-          ctx.letterSpacing = '2px';  // Add spacing between letters
-          const words = block.label?.split(' ') || [];
-          const lines: string[] = [];
-          let currentLine = "";
-          words.forEach(word => {
-            if ((currentLine + word).length < 15) currentLine += (currentLine ? " " : "") + word;
-            else { lines.push(currentLine); currentLine = word; }
-          });
-          lines.push(currentLine);
-          lines.reverse().forEach((line, i) => {
-            // Draw black outline first
-            ctx.strokeText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
-            // Then draw white fill on top
-            ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
-          });
           break;
 
         case 'CASTLE':
@@ -682,6 +640,89 @@ const App: React.FC = () => {
           ctx.arc(block.pos.x + block.width / 2 + 50, block.pos.y + 80, 20, 0, Math.PI * 2);
           ctx.stroke();
           break;
+      }
+    });
+
+    staticCanvasRef.current = canvas;
+  }, []);
+
+  const draw = useCallback((ctx: CanvasRenderingContext2D) => {
+    // 1. Draw Static Layer (Background, Floor, Pipes, Castle)
+    if (staticCanvasRef.current) {
+      ctx.drawImage(staticCanvasRef.current, 0, 0);
+    } else {
+      // Fallback if static canvas not ready
+      ctx.fillStyle = COLORS.SKY;
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      renderStaticWorld(); // Try to init it
+    }
+
+    // 2. Draw Dynamic Blocks (Question Blocks)
+    blocksRef.current.forEach(block => {
+      if (block.type === 'QUESTION') {
+        // Question block with new color scheme
+        let blockColor = '#2B2E4A'; // Default: deep indigo
+        let borderColor = '#FACC15'; // Default: yellow
+
+        if (block.isHit && !block.isCorrect) {
+          // Only change color for wrong answers
+          blockColor = '#FB7185'; // Wrong: pink
+          borderColor = '#FB7185';
+        }
+
+        // Draw main block
+        ctx.fillStyle = blockColor;
+        ctx.fillRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
+
+        // Draw border/outline
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(block.pos.x + 2, block.pos.y + 2, block.width - 4, block.height - 4);
+
+        if (!block.isHit) {
+          // Add 3D beveled effect - top and left highlights
+          ctx.strokeStyle = '#FACC15';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(block.pos.x + 6, block.pos.y + block.height - 6);
+          ctx.lineTo(block.pos.x + 6, block.pos.y + 6);
+          ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + 6);
+          ctx.stroke();
+
+          // Bottom and right shadows
+          ctx.strokeStyle = '#1A1D33';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(block.pos.x + block.width - 6, block.pos.y + 6);
+          ctx.lineTo(block.pos.x + block.width - 6, block.pos.y + block.height - 6);
+          ctx.lineTo(block.pos.x + 6, block.pos.y + block.height - 6);
+          ctx.stroke();
+
+          // Draw the letter (A, B, C, D) - Use cached index if available
+          ctx.fillStyle = '#FFFFFF'; // White text
+          ctx.font = 'bold 48px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+
+          const letter = block.displayIndex || "?";
+          ctx.fillText(letter, block.pos.x + block.width / 2, block.pos.y + block.height / 2 + 2);
+        }
+
+        if (block.cachedLines) {
+          ctx.fillStyle = '#fff';
+          ctx.font = '18px "Press Start 2P"';
+          ctx.textAlign = 'center';
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.letterSpacing = '2px';
+
+          block.cachedLines.forEach((line, i) => {
+            // Draw black outline first
+            ctx.strokeText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
+            // Then draw white fill on top
+            ctx.fillText(line, block.pos.x + block.width / 2, block.pos.y - 40 - i * 28);
+          });
+        }
       }
     });
 

@@ -57,6 +57,9 @@ export interface Block extends Entity {
   label?: string;
   isHit?: boolean;
   isCorrect?: boolean; // Track if this was the correct answer
+  // Rendering cache
+  cachedLines?: string[];
+  displayIndex?: string; // e.g. "A", "B", etc.
 }
 
 export interface Enemy extends Entity {
