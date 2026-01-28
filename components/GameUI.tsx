@@ -116,7 +116,7 @@ const GameUI: React.FC<GameUIProps> = ({
   if (gameState === GameState.MENU) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-12 z-50">
-        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Super Pay Pay<br></br>Finance Quest</h1>
+        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Super Pay-Pay<br></br>Finance Quest</h1>
         <div className="w-full max-w-3xl">
           <div className="flex gap-4 justify-center mb-4">
             <button
@@ -181,6 +181,12 @@ const GameUI: React.FC<GameUIProps> = ({
         <div className="mt-12 text-center">
           <p className="text-lg text-gray-400 mb-6 animate-pulse">JUMP INTO THE RIGHT BLOCK TO ANSWER</p>
           <p className="text-base text-gray-500">ARROW KEYS TO MOVE & JUMP</p>
+        </div>
+
+        <div className="absolute bottom-8 w-full text-center">
+          <p className="text-xs text-gray-500 opacity-70">
+            NOTE: This application is developed for internal use only and is not intended for commercial purposes.
+          </p>
         </div>
       </div>
     );

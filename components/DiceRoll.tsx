@@ -99,7 +99,43 @@ const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete, onBack })
 
     return (
         <div className="flex w-full max-w-7xl mx-auto gap-32 items-center justify-center p-8">
-            {/* LEFT SIDE: DICE AREA */}
+            {/* LEFT SIDE: LIST AREA */}
+            <div className="flex-[2]">
+                <h3 className="text-3xl font-bold text-yellow-400 mb-6 uppercase tracking-wider border-b-4 border-yellow-400/50 pb-2 inline-block">
+                    Source to Pay:
+                </h3>
+                <div className="flex flex-col gap-3">
+                    {mappedSegments.map((seg, idx) => {
+                        const num = idx + 1;
+                        const isSelected = diceResult === num;
+                        // Fade out others if result shown, highlight selected
+                        const opacityClass = showResult ? (isSelected ? 'opacity-100 scale-105' : 'opacity-40 grayscale') : 'opacity-100';
+
+                        return (
+                            <div
+                                key={seg.id}
+                                className={`
+                        flex items-center p-4 rounded-lg border-2 transition-all duration-500
+                        ${opacityClass}
+                        ${isSelected && showResult ? 'bg-white text-black border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)]' : 'bg-white/10 text-white border-white/20'}
+                      `}
+                            >
+                                <div className={`
+                            flex items-center justify-center w-12 h-12 rounded-lg mr-4 font-black text-2xl border-2
+                            ${isSelected && showResult ? 'bg-yellow-400 text-black border-yellow-600' : 'bg-black/40 text-yellow-400 border-yellow-400/50'}
+                        `}>
+                                    {num}
+                                </div>
+                                <div className="text-xl font-bold uppercase tracking-wide flex-1">
+                                    {seg.subtopic}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* RIGHT SIDE: DICE AREA */}
             <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
 
                 {/* DICE CONTAINER */}
@@ -170,42 +206,6 @@ const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete, onBack })
                     )}
                 </div>
 
-            </div>
-
-            {/* RIGHT SIDE: LIST AREA */}
-            <div className="flex-[2]">
-                <h3 className="text-3xl font-bold text-yellow-400 mb-6 uppercase tracking-wider border-b-4 border-yellow-400/50 pb-2 inline-block">
-                    Source to Pay:
-                </h3>
-                <div className="flex flex-col gap-3">
-                    {mappedSegments.map((seg, idx) => {
-                        const num = idx + 1;
-                        const isSelected = diceResult === num;
-                        // Fade out others if result shown, highlight selected
-                        const opacityClass = showResult ? (isSelected ? 'opacity-100 scale-105' : 'opacity-40 grayscale') : 'opacity-100';
-
-                        return (
-                            <div
-                                key={seg.id}
-                                className={`
-                        flex items-center p-4 rounded-lg border-2 transition-all duration-500
-                        ${opacityClass}
-                        ${isSelected && showResult ? 'bg-white text-black border-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)]' : 'bg-white/10 text-white border-white/20'}
-                      `}
-                            >
-                                <div className={`
-                            flex items-center justify-center w-12 h-12 rounded-lg mr-4 font-black text-2xl border-2
-                            ${isSelected && showResult ? 'bg-yellow-400 text-black border-yellow-600' : 'bg-black/40 text-yellow-400 border-yellow-400/50'}
-                        `}>
-                                    {num}
-                                </div>
-                                <div className="text-xl font-bold uppercase tracking-wide flex-1">
-                                    {seg.subtopic}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
             </div>
 
             {/* BACK BUTTON */}
