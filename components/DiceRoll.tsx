@@ -101,9 +101,9 @@ const DiceRoll: React.FC<DiceRollProps> = ({ segments, onSpinComplete, onBack })
         <div className="flex w-full max-w-7xl mx-auto gap-32 items-center justify-center p-8">
             {/* LEFT SIDE: LIST AREA */}
             <div className="flex-[2]">
-                <h3 className="text-3xl font-bold text-yellow-400 mb-6 uppercase tracking-wider border-b-4 border-yellow-400/50 pb-2 inline-block">
+                {/*<h3 className="text-3xl font-bold text-yellow-400 mb-6 uppercase tracking-wider border-b-4 border-yellow-400/50 pb-2 inline-block">
                     Source to Pay:
-                </h3>
+                </h3>*/}
                 <div className="flex flex-col gap-3">
                     {mappedSegments.map((seg, idx) => {
                         const num = idx + 1;

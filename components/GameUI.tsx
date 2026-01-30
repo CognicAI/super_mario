@@ -172,7 +172,7 @@ const GameUI: React.FC<GameUIProps> = ({
           */}
 
           <button
-            onClick={() => onStart('Source to Pay', undefined)} // Hardcoded to "Source to Pay"
+            onClick={() => onStart('Source to Pay', undefined)}// Hardcoded to "Source to Pay"
             className="w-full bg-red-600 hover:bg-red-700 text-white p-6 text-3xl border-b-8 border-red-900 active:border-b-0 active:translate-y-2 transition-all"
           >
             START GAME
@@ -185,7 +185,7 @@ const GameUI: React.FC<GameUIProps> = ({
 
         <div className="absolute bottom-8 w-full text-center">
           <p className="text-xs text-gray-500 opacity-70">
-            NOTE: This application is developed for internal use only and is not intended for commercial purposes.
+            NOTE: This application is developed for internal use only.
           </p>
         </div>
       </div>
