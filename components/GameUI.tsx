@@ -116,13 +116,13 @@ const GameUI: React.FC<GameUIProps> = ({
   if (gameState === GameState.MENU) {
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white p-12 z-50">
-        <h1 className="text-7xl mb-8 text-yellow-400 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}>Super Pay-Pay<br></br>Finance Quest</h1>
+        <h1 className="text-7xl mb-8 text-center uppercase leading-relaxed" style={{ WebkitTextStroke: '3px black', paintOrder: 'stroke fill' }}><span className="text-yellow-400">Super Pay-Pay</span><br></br><span className="text-red-500">Fin</span><span className="text-yellow-400">Quest</span></h1>
         <div className="w-full max-w-3xl">
           <div className="flex gap-4 justify-center mb-4">
             <button
               className="flex-1 px-8 py-6 text-xl font-bold rounded border-b-8 bg-yellow-500 text-black border-yellow-700 shadow-lg scale-105 cursor-default"
             >
-              BOOKKEEPING - SOURCE TO PAY
+              ACCOUNTING - SOURCE TO PAY
             </button>
           </div>
           {/* Difficulty Selector - HIDDEN: Hardcoded to fetch all questions */}
